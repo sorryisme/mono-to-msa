@@ -52,8 +52,8 @@
 ### 실행 결과
 
 - `./gradlew spotlessApply compileJava compileTestGroovy` — 성공
-- `./gradlew test --tests "…service.*" --tests "…controller.*" --tests "…exception.*"` — 성공
-- 리포지토리·엔티티 테스트(`@DataJpaTest`)는 실제 MySQL 이 필요한데 이 환경에서 Docker 데몬이 떠 있지 않아 **미실행**. `docker compose up -d db-master db-replica` 후 `./gradlew test` 로 확인이 필요하다.
+- `./gradlew test` (MySQL master/replica 기동 상태) — **15개 테스트 클래스 전부 통과, 실패·스킵 0건**
+- `inventory` 의 UNIQUE 제약(`uk_inventory_product_option_id`) 이 master·replica 양쪽에 반영된 것을 `SHOW INDEX` 로 확인. `EntityMappingTest` 의 `ddl-auto=validate` 검증도 통과.
 
 ## 4. 남은 일
 
