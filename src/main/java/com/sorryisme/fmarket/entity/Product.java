@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "product")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ProductEntity extends BaseTimeEntity {
+public class Product extends BaseTimeEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -45,7 +45,7 @@ public class ProductEntity extends BaseTimeEntity {
   private LocalDateTime deletedAt;
 
   @Builder
-  private ProductEntity(
+  private Product(
       Long id,
       String productName,
       String description,

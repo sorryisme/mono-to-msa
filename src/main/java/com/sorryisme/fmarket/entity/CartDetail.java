@@ -19,7 +19,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "cart_detail")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class CartDetailEntity extends BaseTimeEntity {
+public class CartDetail extends BaseTimeEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,7 +27,7 @@ public class CartDetailEntity extends BaseTimeEntity {
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "cart_id", nullable = false)
-  private CartEntity cart;
+  private Cart cart;
 
   @Column(name = "product_option_id", nullable = false)
   private Long productOptionId;
@@ -36,7 +36,7 @@ public class CartDetailEntity extends BaseTimeEntity {
   private Integer quantity;
 
   @Builder
-  private CartDetailEntity(Long id, Long productOptionId, Integer quantity) {
+  private CartDetail(Long id, Long productOptionId, Integer quantity) {
     this.id = id;
     this.productOptionId = productOptionId;
     this.quantity = quantity;
@@ -49,8 +49,8 @@ public class CartDetailEntity extends BaseTimeEntity {
     this.quantity = quantity;
   }
 
-  /** CartEntity 의 연관관계 편의 메서드에서만 호출한다. */
-  void assignCart(CartEntity cart) {
+  /** Cart 의 연관관계 편의 메서드에서만 호출한다. */
+  void assignCart(Cart cart) {
     this.cart = cart;
   }
 }

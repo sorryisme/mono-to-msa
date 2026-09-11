@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -30,7 +31,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "\"order\"")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class OrderEntity extends BaseTimeEntity {
+public class Order extends BaseTimeEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -50,16 +51,16 @@ public class OrderEntity extends BaseTimeEntity {
   private BigDecimal totalAmount;
 
   @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-  private List<OrderDetailEntity> orderDetails = new ArrayList<>();
+  private List<OrderDetail> orderDetails = new ArrayList<>();
 
   @Builder
-  private OrderEntity(
+  private Order(
       Long id,
       Long userId,
       LocalDateTime orderDate,
       OrderStatus status,
       BigDecimal totalAmount,
-      List<OrderDetailEntity> orderDetails) {
+      List<OrderDetail> orderDetails) {
     this.id = id;
     this.userId = userId;
     this.orderDate = orderDate == null ? LocalDateTime.now() : orderDate;
@@ -70,12 +71,44 @@ public class OrderEntity extends BaseTimeEntity {
     }
   }
 
-  public List<OrderDetailEntity> getOrderDetails() {
+  /**
+   * 주문 옵션과 요청 수량으로 PENDING 주문을 만든다. 총액은 옵션 판매가 x 수량의 합이다.
+   *
+   * @param productOptions 실제 존재하는 상품 옵션
+   * @param requestQuantityMap productOptionId -> 요청 수량
+   */
+  public static Order of(
+      List<ProductOption> productOptions, Map<Long, Integer> requestQuantityMap, Long userId) {
+    List<OrderDetail> details =
+        productOptions.stream()
+            .map(
+                option ->
+                    OrderDetail.builder()
+                        .productOptionId(option.getId())
+                        .price(option.getSalePrice())
+                        .quantity(requestQuantityMap.getOrDefault(option.getId(), 0))
+                        .build())
+            .toList();
+
+    BigDecimal totalAmount =
+        details.stream()
+            .map(detail -> detail.getPrice().multiply(BigDecimal.valueOf(detail.getQuantity())))
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+    return Order.builder()
+        .userId(userId)
+        .status(OrderStatus.PENDING)
+        .totalAmount(totalAmount)
+        .orderDetails(details)
+        .build();
+  }
+
+  public List<OrderDetail> getOrderDetails() {
     return Collections.unmodifiableList(orderDetails);
   }
 
   /** 연관관계 편의 메서드. 양쪽 메모리 상태를 함께 맞춘다. */
-  public void addOrderDetail(OrderDetailEntity orderDetail) {
+  public void addOrderDetail(OrderDetail orderDetail) {
     orderDetails.add(orderDetail);
     orderDetail.assignOrder(this);
   }

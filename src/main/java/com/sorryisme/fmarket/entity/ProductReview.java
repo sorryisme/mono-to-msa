@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "product_review")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ProductReviewEntity extends BaseTimeEntity {
+public class ProductReview extends BaseTimeEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,8 +36,7 @@ public class ProductReviewEntity extends BaseTimeEntity {
   private Long userId;
 
   @Builder
-  private ProductReviewEntity(
-      Long id, Long productId, Integer rating, String reviewText, Long userId) {
+  private ProductReview(Long id, Long productId, Integer rating, String reviewText, Long userId) {
     this.id = id;
     this.productId = productId;
     this.rating = rating;

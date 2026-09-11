@@ -20,7 +20,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "\"user\"")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class UserEntity extends BaseTimeEntity {
+public class User extends BaseTimeEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -52,7 +52,7 @@ public class UserEntity extends BaseTimeEntity {
   private LocalDateTime deletedAt;
 
   @Builder
-  private UserEntity(
+  private User(
       Long id,
       String loginId,
       String password,
@@ -67,7 +67,7 @@ public class UserEntity extends BaseTimeEntity {
     this.salt = salt;
     this.name = name;
     this.email = email;
-    this.role = role;
+    this.role = role == null ? UserRole.USER : role;
     this.phoneNumber = phoneNumber;
   }
 

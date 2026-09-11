@@ -28,7 +28,7 @@ class EntityMappingTest extends Specification {
 
     def "유저를 저장하면 식별자가 생성되고 role 이 문자열로 저장된다"() {
         given:
-        UserEntity user = UserEntity.builder()
+        User user = User.builder()
                 .loginId("jpa-user-1")
                 .password("hashed")
                 .salt("salt")
@@ -41,7 +41,7 @@ class EntityMappingTest extends Specification {
         em.persist(user)
         em.flush()
         em.clear()
-        UserEntity found = em.find(UserEntity, user.getId())
+        User found = em.find(User, user.getId())
         then:
         user.getId() != null
         found.getLoginId() == "jpa-user-1"
@@ -51,7 +51,7 @@ class EntityMappingTest extends Specification {
 
     def "주문을 저장하면 주문 상세까지 함께 저장된다"() {
         given:
-        UserEntity user = UserEntity.builder()
+        User user = User.builder()
                 .loginId("jpa-user-2")
                 .password("hashed")
                 .salt("salt")
@@ -61,13 +61,13 @@ class EntityMappingTest extends Specification {
                 .build()
         em.persist(user)
 
-        ProductEntity product = ProductEntity.builder()
+        Product product = Product.builder()
                 .productName("티셔츠")
                 .description("설명")
                 .build()
         em.persist(product)
 
-        ProductOptionEntity option = ProductOptionEntity.builder()
+        ProductOption option = ProductOption.builder()
                 .productId(product.getId())
                 .optionName("L")
                 .originPrice(new BigDecimal("10000.00"))
@@ -75,11 +75,11 @@ class EntityMappingTest extends Specification {
                 .build()
         em.persist(option)
 
-        OrderEntity order = OrderEntity.builder()
+        Order order = Order.builder()
                 .userId(user.getId())
                 .totalAmount(new BigDecimal("18000.00"))
                 .orderDetails([
-                        OrderDetailEntity.builder()
+                        OrderDetail.builder()
                                 .productOptionId(option.getId())
                                 .quantity(2)
                                 .price(new BigDecimal("9000.00"))
@@ -90,7 +90,7 @@ class EntityMappingTest extends Specification {
         em.persist(order)
         em.flush()
         em.clear()
-        OrderEntity found = em.find(OrderEntity, order.getId())
+        Order found = em.find(Order, order.getId())
         then:
         found.getStatus() == OrderStatus.PENDING
         found.getOrderDate() != null
@@ -101,7 +101,7 @@ class EntityMappingTest extends Specification {
 
     def "장바구니 상세를 제거하면 orphanRemoval 로 함께 삭제된다"() {
         given:
-        UserEntity user = UserEntity.builder()
+        User user = User.builder()
                 .loginId("jpa-user-3")
                 .password("hashed")
                 .salt("salt")
@@ -111,9 +111,9 @@ class EntityMappingTest extends Specification {
                 .build()
         em.persist(user)
 
-        ProductEntity product = ProductEntity.builder().productName("바지").description("설명").build()
+        Product product = Product.builder().productName("바지").description("설명").build()
         em.persist(product)
-        ProductOptionEntity option = ProductOptionEntity.builder()
+        ProductOption option = ProductOption.builder()
                 .productId(product.getId())
                 .optionName("M")
                 .originPrice(new BigDecimal("5000.00"))
@@ -121,8 +121,8 @@ class EntityMappingTest extends Specification {
                 .build()
         em.persist(option)
 
-        CartEntity cart = CartEntity.of(user.getId())
-        cart.addCartDetail(CartDetailEntity.builder().productOptionId(option.getId()).quantity(1).build())
+        Cart cart = Cart.of(user.getId())
+        cart.addCartDetail(CartDetail.builder().productOptionId(option.getId()).quantity(1).build())
         em.persist(cart)
         em.flush()
         when:
@@ -130,6 +130,6 @@ class EntityMappingTest extends Specification {
         em.flush()
         em.clear()
         then:
-        em.find(CartEntity, cart.getId()).getCartDetails().isEmpty()
+        em.find(Cart, cart.getId()).getCartDetails().isEmpty()
     }
 }

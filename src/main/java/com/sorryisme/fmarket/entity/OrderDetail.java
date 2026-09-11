@@ -20,7 +20,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "order_detail")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class OrderDetailEntity extends BaseTimeEntity {
+public class OrderDetail extends BaseTimeEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -28,7 +28,7 @@ public class OrderDetailEntity extends BaseTimeEntity {
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "order_id", nullable = false)
-  private OrderEntity order;
+  private Order order;
 
   @Column(name = "product_option_id", nullable = false)
   private Long productOptionId;
@@ -40,15 +40,15 @@ public class OrderDetailEntity extends BaseTimeEntity {
   private BigDecimal price;
 
   @Builder
-  private OrderDetailEntity(Long id, Long productOptionId, Integer quantity, BigDecimal price) {
+  private OrderDetail(Long id, Long productOptionId, Integer quantity, BigDecimal price) {
     this.id = id;
     this.productOptionId = productOptionId;
     this.quantity = quantity;
     this.price = price;
   }
 
-  /** OrderEntity#addOrderDetail 에서만 호출한다. */
-  void assignOrder(OrderEntity order) {
+  /** Order#addOrderDetail 에서만 호출한다. */
+  void assignOrder(Order order) {
     this.order = order;
   }
 }

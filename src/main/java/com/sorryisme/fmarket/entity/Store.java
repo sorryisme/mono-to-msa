@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "store")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class StoreEntity extends BaseTimeEntity {
+public class Store extends BaseTimeEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -39,7 +39,7 @@ public class StoreEntity extends BaseTimeEntity {
   private Long userId;
 
   @Builder
-  private StoreEntity(
+  private Store(
       Long id,
       String storeName,
       String logoUrl,

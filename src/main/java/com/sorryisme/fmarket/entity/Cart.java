@@ -21,7 +21,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "cart")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class CartEntity extends BaseTimeEntity {
+public class Cart extends BaseTimeEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -31,10 +31,10 @@ public class CartEntity extends BaseTimeEntity {
   private Long userId;
 
   @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
-  private List<CartDetailEntity> cartDetails = new ArrayList<>();
+  private List<CartDetail> cartDetails = new ArrayList<>();
 
   @Builder
-  private CartEntity(Long id, Long userId, List<CartDetailEntity> cartDetails) {
+  private Cart(Long id, Long userId, List<CartDetail> cartDetails) {
     this.id = id;
     this.userId = userId;
     if (cartDetails != null) {
@@ -42,22 +42,22 @@ public class CartEntity extends BaseTimeEntity {
     }
   }
 
-  public static CartEntity of(Long userId) {
-    return CartEntity.builder().userId(userId).build();
+  public static Cart of(Long userId) {
+    return Cart.builder().userId(userId).build();
   }
 
-  public List<CartDetailEntity> getCartDetails() {
+  public List<CartDetail> getCartDetails() {
     return Collections.unmodifiableList(cartDetails);
   }
 
   /** 연관관계 편의 메서드. 양쪽 메모리 상태를 함께 맞춘다. */
-  public void addCartDetail(CartDetailEntity cartDetail) {
+  public void addCartDetail(CartDetail cartDetail) {
     cartDetails.add(cartDetail);
     cartDetail.assignCart(this);
   }
 
   /** 장바구니에서 항목을 제거한다. orphanRemoval 로 DELETE 까지 이어진다. */
-  public void removeCartDetail(CartDetailEntity cartDetail) {
+  public void removeCartDetail(CartDetail cartDetail) {
     cartDetails.remove(cartDetail);
     cartDetail.assignCart(null);
   }

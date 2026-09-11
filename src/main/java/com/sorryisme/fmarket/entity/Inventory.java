@@ -21,7 +21,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "inventory")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class InventoryEntity extends BaseTimeEntity {
+public class Inventory extends BaseTimeEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,7 +37,7 @@ public class InventoryEntity extends BaseTimeEntity {
   private LocalDateTime deletedAt;
 
   @Builder
-  private InventoryEntity(Long id, Long productOptionId, Integer quantity) {
+  private Inventory(Long id, Long productOptionId, Integer quantity) {
     this.id = id;
     this.productOptionId = productOptionId;
     this.quantity = quantity;
@@ -49,7 +49,7 @@ public class InventoryEntity extends BaseTimeEntity {
       throw new IllegalArgumentException("차감 수량은 1 이상이어야 합니다: " + amount);
     }
     if (this.quantity < amount) {
-      throw new IllegalStateException("재고가 부족합니다. 현재=" + this.quantity + ", 요청=" + amount);
+      throw new IllegalArgumentException("재고 수량이 충분하지 않습니다.");
     }
     this.quantity -= amount;
   }
