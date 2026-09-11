@@ -161,7 +161,8 @@ CREATE TABLE `inventory` (
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '생성 일시',
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정 일시',
   PRIMARY KEY (`id`),
-  KEY `product_option_id` (`product_option_id`)
+  -- 옵션당 재고 행은 하나여야 한다. 조건부 차감 UPDATE 가 옵션당 정확히 1행을 갱신한다는 전제를 DB 가 보장한다.
+  UNIQUE KEY `uk_inventory_product_option_id` (`product_option_id`)
 );
 
 

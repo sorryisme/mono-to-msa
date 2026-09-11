@@ -19,33 +19,59 @@ class InventoryRepositoryTest extends Specification {
     @Autowired
     EntityManager em
 
-    def "productOptionId 목록으로 재고를 잠금 조회한다"() {
-        when:
-        List<Inventory> inventories = inventoryRepository.findAllByProductOptionIdInForUpdate([1L, 2L])
-
-        then:
-        inventories.size() >= 1
-        inventories*.getProductOptionId().containsAll([1L, 2L])
-        inventories.every { it.getQuantity() >= 0 }
-    }
-
-    def "잠금 조회한 재고의 수량 변경은 변경 감지로 반영된다"() {
+    def "조건부 차감은 재고가 충분하면 1행을 갱신하고 수량을 줄인다"() {
         given:
-        Inventory before = inventoryRepository.findAllByProductOptionIdInForUpdate([1L]).first()
-        int beforeQuantity = before.getQuantity()
+        int before = quantityOf(1L)
 
         when:
-        before.increase(10)
-        em.flush()
+        int affected = inventoryRepository.decreaseQuantity(1L, 10)
         em.clear()
-        Inventory after = inventoryRepository.findAllByProductOptionIdInForUpdate([1L]).first()
 
         then:
-        after.getQuantity() == beforeQuantity + 10
+        affected == 1
+        quantityOf(1L) == before - 10
     }
 
-    def "없는 옵션 id 로 조회하면 빈 목록을 돌려준다"() {
+    def "조건부 차감은 재고보다 많이 빼려 하면 0행을 갱신하고 수량을 그대로 둔다"() {
+        given:
+        int before = quantityOf(1L)
+
+        when:
+        int affected = inventoryRepository.decreaseQuantity(1L, before + 1)
+        em.clear()
+
+        then:
+        affected == 0
+        quantityOf(1L) == before
+    }
+
+    def "재고 행이 없는 옵션을 차감하면 0행이 갱신된다"() {
         expect:
-        inventoryRepository.findAllByProductOptionIdInForUpdate([999999L]).isEmpty()
+        inventoryRepository.decreaseQuantity(999999L, 1) == 0
+    }
+
+    def "조건부 복구는 수량을 되돌린다"() {
+        given:
+        int before = quantityOf(2L)
+
+        when:
+        int affected = inventoryRepository.increaseQuantity(2L, 7)
+        em.clear()
+
+        then:
+        affected == 1
+        quantityOf(2L) == before + 7
+    }
+
+    def "재고 행이 없는 옵션을 복구하면 0행이 갱신된다"() {
+        expect:
+        inventoryRepository.increaseQuantity(999999L, 1) == 0
+    }
+
+    private int quantityOf(Long productOptionId) {
+        return em.createQuery("select i from Inventory i where i.productOptionId = :id", Inventory)
+                .setParameter("id", productOptionId)
+                .getSingleResult()
+                .getQuantity()
     }
 }

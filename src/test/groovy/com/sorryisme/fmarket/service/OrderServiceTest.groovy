@@ -5,7 +5,6 @@ import com.sorryisme.fmarket.dto.request.OrderItemRequestDto
 import com.sorryisme.fmarket.dto.request.OrderSearchDto
 import com.sorryisme.fmarket.dto.response.OrderListResponseDto
 import com.sorryisme.fmarket.dto.response.OrderResponseDto
-import com.sorryisme.fmarket.entity.Inventory
 import com.sorryisme.fmarket.entity.Order
 import com.sorryisme.fmarket.entity.ProductOption
 import com.sorryisme.fmarket.enums.OrderStatus
@@ -31,7 +30,6 @@ class OrderServiceTest extends Specification {
     OrderService orderService = new OrderService(orderRepository, inventoryRepository, productOptionRepository)
 
     List<ProductOption> productOptions
-    List<Inventory> inventories
 
     private static final String UUID = "166f9067-2e5f-4932-e314-f438ae846d24"
 
@@ -40,7 +38,6 @@ class OrderServiceTest extends Specification {
                 DomainFixture.createProductOption(1L, 101L, "Option1", "900.00"),
                 DomainFixture.createProductOption(2L, 102L, "Option2", "1800.00")
         ]
-        inventories = DomainFixture.createInventories()
     }
 
     def "기간 조건이 있으면 기간 조회 메서드로, 없으면 사용자 기준으로 페이징 조회한다"() {
@@ -90,22 +87,21 @@ class OrderServiceTest extends Specification {
         e.errorCode == ErrorCode.ORDER_NOT_FOUND
     }
 
-    def "주문 확정 시 상태가 COMPLETED 로 바뀌고 orderId가 리턴된다"() {
+    def "주문 확정은 PENDING 인 주문만 COMPLETED 로 전이시킨다"() {
         given:
-        Order order = DomainFixture.createOrder(1L, OrderStatus.PENDING)
-        orderRepository.findById(1L) >> Optional.of(order)
+        orderRepository.existsById(1L) >> true
 
         when:
         Long result = orderService.confirmOrder(1L)
 
         then:
+        1 * orderRepository.updateStatusIfCurrent(1L, OrderStatus.PENDING, OrderStatus.COMPLETED) >> 1
         result == 1L
-        order.getStatus() == OrderStatus.COMPLETED
     }
 
     def "주문 확정 시 주문이 없을 경우 에러가 발생한다"() {
         given:
-        orderRepository.findById(_ as Long) >> Optional.empty()
+        orderRepository.existsById(_ as Long) >> false
 
         when:
         orderService.confirmOrder(1L)
@@ -113,27 +109,38 @@ class OrderServiceTest extends Specification {
         then:
         def e = thrown(BusinessException)
         e.errorCode == ErrorCode.ORDER_NOT_FOUND
+        0 * orderRepository.updateStatusIfCurrent(_, _, _)
     }
 
-    def "주문취소 시 재고가 복구되고 상태가 CANCELLED 로 바뀐다"() {
+    def "주문 확정 시 이미 상태가 바뀌어 전이에 실패하면 에러가 발생한다"() {
         given:
-        Order order = DomainFixture.createOrder(1L, OrderStatus.PENDING)
-        Inventory inventory = DomainFixture.createInventory(1L, 3)
-        orderRepository.findByIdForUpdate(1L) >> Optional.of(order)
-        inventoryRepository.findAllByProductOptionIdInForUpdate({ it.contains(1L) }) >> [inventory]
+        orderRepository.existsById(1L) >> true
+        orderRepository.updateStatusIfCurrent(1L, OrderStatus.PENDING, OrderStatus.COMPLETED) >> 0
+
+        when:
+        orderService.confirmOrder(1L)
+
+        then:
+        def e = thrown(BusinessException)
+        e.errorCode == ErrorCode.ORDER_STATUS_NOT_CHANGEABLE
+    }
+
+    def "주문취소 시 상태가 CANCELLED 로 전이되고 재고가 복구된다"() {
+        given:
+        orderRepository.findWithDetailsById(1L) >> Optional.of(DomainFixture.createOrder(1L, OrderStatus.PENDING))
+        orderRepository.updateStatusIfCurrent(1L, OrderStatus.PENDING, OrderStatus.CANCELLED) >> 1
 
         when:
         Long result = orderService.cancelOrder(1L)
 
         then:
+        1 * inventoryRepository.increaseQuantity(1L, 5) >> 1
         result == 1L
-        order.getStatus() == OrderStatus.CANCELLED
-        inventory.getQuantity() == 3 + 5
     }
 
     def "주문취소 시 주문이 없을 경우 에러를 발생시킨다"() {
         given:
-        orderRepository.findByIdForUpdate(1L) >> Optional.empty()
+        orderRepository.findWithDetailsById(1L) >> Optional.empty()
 
         when:
         orderService.cancelOrder(1L)
@@ -143,9 +150,10 @@ class OrderServiceTest extends Specification {
         e.errorCode == ErrorCode.ORDER_NOT_FOUND
     }
 
-    def "주문취소 시 주문 상태가 변경 완료 상태 일때 에러가 발생된다."() {
+    def "주문취소 시 상태 전이에 실패하면 에러가 발생하고 재고를 복구하지 않는다"() {
         given:
-        orderRepository.findByIdForUpdate(1L) >> Optional.of(DomainFixture.createOrder(1L, OrderStatus.COMPLETED))
+        orderRepository.findWithDetailsById(1L) >> Optional.of(DomainFixture.createOrder(1L, OrderStatus.COMPLETED))
+        orderRepository.updateStatusIfCurrent(1L, OrderStatus.PENDING, OrderStatus.CANCELLED) >> 0
 
         when:
         orderService.cancelOrder(1L)
@@ -156,17 +164,32 @@ class OrderServiceTest extends Specification {
         0 * inventoryRepository._
     }
 
-    def "createOrder는 주문을 저장하고 재고를 차감한다"() {
+    def "주문취소 시 재고 행이 없어도 취소는 성공한다"() {
+        given:
+        orderRepository.findWithDetailsById(1L) >> Optional.of(DomainFixture.createOrder(1L, OrderStatus.PENDING))
+        orderRepository.updateStatusIfCurrent(1L, OrderStatus.PENDING, OrderStatus.CANCELLED) >> 1
+        inventoryRepository.increaseQuantity(1L, 5) >> 0
+
+        expect:
+        orderService.cancelOrder(1L) == 1L
+    }
+
+    def "createOrder는 옵션 ID 오름차순으로 재고를 차감하고 주문을 저장한다"() {
         given:
         OrderCreateDto orderCreateDto = new OrderCreateDto([
-                new OrderItemRequestDto(1L, 1),
-                new OrderItemRequestDto(2L, 2)
+                new OrderItemRequestDto(2L, 2),
+                new OrderItemRequestDto(1L, 1)
         ])
         productOptionRepository.findAllByIdInAndStatus(_, ProductStatus.ON_SALE) >> productOptions
-        inventoryRepository.findAllByProductOptionIdInForUpdate(_) >> inventories
 
         when:
         orderService.createOrder(UUID, 1L, orderCreateDto)
+
+        then: "요청 순서와 무관하게 옵션 ID 오름차순으로 차감해야 데드락을 피할 수 있다"
+        1 * inventoryRepository.decreaseQuantity(1L, 1) >> 1
+
+        then:
+        1 * inventoryRepository.decreaseQuantity(2L, 2) >> 1
 
         then:
         1 * orderRepository.save({ Order o ->
@@ -174,18 +197,16 @@ class OrderServiceTest extends Specification {
                     o.getStatus() == OrderStatus.PENDING &&
                     o.getTotalAmount() == new BigDecimal("900.00") + new BigDecimal("1800.00") * 2
         })
-        inventories[0].getQuantity() == 0
-        inventories[1].getQuantity() == 0
     }
 
-    def "createOrder는 재고 부족 시 예외를 발생시킨다"() {
+    def "createOrder는 재고 차감이 0행이면 예외를 발생시키고 주문을 저장하지 않는다"() {
         given:
         OrderCreateDto orderCreateDto = new OrderCreateDto([
                 new OrderItemRequestDto(1L, 3),
                 new OrderItemRequestDto(2L, 2)
         ])
         productOptionRepository.findAllByIdInAndStatus(_, ProductStatus.ON_SALE) >> productOptions
-        inventoryRepository.findAllByProductOptionIdInForUpdate(_) >> inventories
+        inventoryRepository.decreaseQuantity(1L, 3) >> 0
 
         when:
         orderService.createOrder(UUID, 1L, orderCreateDto)
@@ -193,6 +214,7 @@ class OrderServiceTest extends Specification {
         then:
         def e = thrown(BusinessException)
         e.errorCode == ErrorCode.OUT_OF_STOCK
+        0 * orderRepository.save(_)
     }
 
     def "createOrder는 판매중이 아닌 옵션이 섞여 있으면 주문을 저장하지 않고 거절한다"() {
@@ -217,7 +239,7 @@ class OrderServiceTest extends Specification {
         given:
         OrderCreateDto orderCreateDto = new OrderCreateDto([new OrderItemRequestDto(1L, 1)])
         productOptionRepository.findAllByIdInAndStatus(_, ProductStatus.ON_SALE) >> [productOptions[0]]
-        inventoryRepository.findAllByProductOptionIdInForUpdate(_) >> []
+        inventoryRepository.decreaseQuantity(1L, 1) >> 0
 
         when:
         orderService.createOrder(UUID, 1L, orderCreateDto)
