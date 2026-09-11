@@ -38,7 +38,7 @@ if bash scripts/guard-scan.sh "${files[@]}"; then ok "금지 패턴 없음"; els
 step "3/5 시크릿 / 대용량 파일"
 if bash scripts/secret-scan.sh "${files[@]}"; then ok "시크릿 없음"; else rc=1; fi
 
-step "4/5 의존 방향 (controller -> service -> mapper)"
+step "4/5 의존 방향 (controller -> service -> repository)"
 if bash scripts/arch-check.sh "${files[@]}"; then ok "의존 방향 정상"; else rc=1; fi
 
 step "5/5 스키마 변경 확인"
@@ -50,7 +50,7 @@ for f in "${files[@]}"; do
 done
 if [ $schema_changed -eq 1 ]; then
   warn "schema.sql / data.sql / docker-init 이 변경되었습니다."
-  info "master/replica 양쪽에 반영되는지, 매퍼 XML 과 컬럼이 일치하는지 확인하세요."
+  info "master/replica 양쪽에 반영되는지, 엔티티 매핑과 컬럼이 일치하는지 확인하세요 (EntityMappingTest 가 validate 로 검사)."
 else
   ok "스키마 변경 없음"
 fi
