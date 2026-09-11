@@ -2,6 +2,7 @@ package com.sorryisme.fmarket.service;
 
 import com.sorryisme.fmarket.annotation.IdempotencyKeyParam;
 import com.sorryisme.fmarket.annotation.Idempotent;
+import com.sorryisme.fmarket.common.ErrorCode;
 import com.sorryisme.fmarket.common.PageableSupport;
 import com.sorryisme.fmarket.dto.request.OrderCreateDto;
 import com.sorryisme.fmarket.dto.request.OrderSearchDto;
@@ -13,7 +14,7 @@ import com.sorryisme.fmarket.entity.OrderDetail;
 import com.sorryisme.fmarket.entity.ProductOption;
 import com.sorryisme.fmarket.enums.OrderStatus;
 import com.sorryisme.fmarket.enums.ProductStatus;
-import com.sorryisme.fmarket.exception.NotFoundDataException;
+import com.sorryisme.fmarket.exception.BusinessException;
 import com.sorryisme.fmarket.repository.InventoryRepository;
 import com.sorryisme.fmarket.repository.OrderRepository;
 import com.sorryisme.fmarket.repository.ProductOptionRepository;
@@ -60,7 +61,7 @@ public class OrderService {
     Order order =
         orderRepository
             .findWithDetailsById(id)
-            .orElseThrow(() -> new NotFoundDataException("찾을 수 없는 주문입니다."));
+            .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
 
     return OrderResponseDto.from(order);
   }
@@ -70,7 +71,7 @@ public class OrderService {
     Order order =
         orderRepository
             .findById(orderId)
-            .orElseThrow(() -> new NotFoundDataException("찾을 수 없는 주문입니다."));
+            .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
 
     order.changeStatus(OrderStatus.COMPLETED);
     return orderId;
@@ -82,10 +83,10 @@ public class OrderService {
     Order order =
         orderRepository
             .findByIdForUpdate(orderId)
-            .orElseThrow(() -> new NotFoundDataException("찾을 수 없는 주문입니다."));
+            .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
 
     if (order.getStatus() != OrderStatus.PENDING)
-      throw new IllegalArgumentException("변경이 불가한 상태입니다");
+      throw new BusinessException(ErrorCode.ORDER_STATUS_NOT_CHANGEABLE);
 
     // 같은 옵션이 여러 상세에 걸쳐 있으면 수량을 합쳐 되돌린다.
     Map<Long, Integer> restoreQuantityMap =
@@ -115,7 +116,7 @@ public class OrderService {
         productOptionRepository.findAllByIdInAndStatus(
             requestQuantityMap.keySet(), ProductStatus.ON_SALE);
     if (productOptions.size() != requestQuantityMap.size())
-      throw new IllegalArgumentException("판매 중이 아닌 상품 옵션이 포함되어 있습니다.");
+      throw new BusinessException(ErrorCode.PRODUCT_OPTION_NOT_ON_SALE);
 
     // 2. 주문 생성 (주문 상세는 cascade 로 함께 저장)
     Order order = Order.of(productOptions, requestQuantityMap, userId);
@@ -131,7 +132,7 @@ public class OrderService {
     requestQuantityMap.forEach(
         (productOptionId, quantity) -> {
           Inventory inventory = inventoryMap.get(productOptionId);
-          if (inventory == null) throw new IllegalArgumentException("재고 수량이 충분하지 않습니다.");
+          if (inventory == null) throw new BusinessException(ErrorCode.OUT_OF_STOCK);
           inventory.decrease(quantity);
         });
 

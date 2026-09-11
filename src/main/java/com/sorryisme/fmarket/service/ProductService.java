@@ -1,5 +1,6 @@
 package com.sorryisme.fmarket.service;
 
+import com.sorryisme.fmarket.common.ErrorCode;
 import com.sorryisme.fmarket.common.PageableSupport;
 import com.sorryisme.fmarket.dto.request.ProductReviewRequestDto;
 import com.sorryisme.fmarket.dto.request.ProductSearchDto;
@@ -10,7 +11,7 @@ import com.sorryisme.fmarket.dto.response.ProductReviewResponseDto;
 import com.sorryisme.fmarket.entity.Product;
 import com.sorryisme.fmarket.entity.ProductReview;
 import com.sorryisme.fmarket.enums.ProductStatus;
-import com.sorryisme.fmarket.exception.NotFoundDataException;
+import com.sorryisme.fmarket.exception.BusinessException;
 import com.sorryisme.fmarket.repository.MajorCategoryRepository;
 import com.sorryisme.fmarket.repository.ProductOptionRepository;
 import com.sorryisme.fmarket.repository.ProductRepository;
@@ -53,7 +54,7 @@ public class ProductService {
     Product product =
         productRepository
             .findByIdAndStatusNot(id, ProductStatus.DELETED)
-            .orElseThrow(() -> new NotFoundDataException("찾을 수 없는 제품입니다."));
+            .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
 
     return ProductResponseDto.of(
         product,
@@ -66,7 +67,7 @@ public class ProductService {
       ProductReviewRequestDto reviewRequestDto, Long productId, Long userId) {
 
     if (!productRepository.existsByIdAndStatusNot(productId, ProductStatus.DELETED))
-      throw new NotFoundDataException("찾을 수 없는 제품입니다.");
+      throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
 
     ProductReview productReview =
         ProductReview.builder()

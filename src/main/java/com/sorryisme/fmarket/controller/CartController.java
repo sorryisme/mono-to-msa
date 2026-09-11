@@ -8,7 +8,9 @@ import com.sorryisme.fmarket.dto.response.CartResponseDto;
 import com.sorryisme.fmarket.service.CartService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 @RestController
 @RequiredArgsConstructor
@@ -18,6 +20,7 @@ public class CartController {
   private final CartService cartService;
 
   @PostMapping("/cart/add")
+  @ResponseStatus(HttpStatus.CREATED)
   @RequireLogin
   public ResponseDto<CartResponseDto> addCart(
       @RequestBody @Valid CartRequestDto cartRequestDto, @LoginUserId Long userId) {

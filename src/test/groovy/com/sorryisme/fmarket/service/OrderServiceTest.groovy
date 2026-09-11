@@ -10,7 +10,8 @@ import com.sorryisme.fmarket.entity.Order
 import com.sorryisme.fmarket.entity.ProductOption
 import com.sorryisme.fmarket.enums.OrderStatus
 import com.sorryisme.fmarket.enums.ProductStatus
-import com.sorryisme.fmarket.exception.NotFoundDataException
+import com.sorryisme.fmarket.exception.BusinessException
+import com.sorryisme.fmarket.common.ErrorCode
 import com.sorryisme.fmarket.repository.InventoryRepository
 import com.sorryisme.fmarket.repository.OrderRepository
 import com.sorryisme.fmarket.repository.ProductOptionRepository
@@ -85,8 +86,8 @@ class OrderServiceTest extends Specification {
         orderService.findOneOrder(1L)
 
         then:
-        def e = thrown(NotFoundDataException.class)
-        e.getMessage() == "찾을 수 없는 주문입니다."
+        def e = thrown(BusinessException)
+        e.errorCode == ErrorCode.ORDER_NOT_FOUND
     }
 
     def "주문 확정 시 상태가 COMPLETED 로 바뀌고 orderId가 리턴된다"() {
@@ -110,8 +111,8 @@ class OrderServiceTest extends Specification {
         orderService.confirmOrder(1L)
 
         then:
-        def e = thrown(NotFoundDataException.class)
-        e.getMessage() == "찾을 수 없는 주문입니다."
+        def e = thrown(BusinessException)
+        e.errorCode == ErrorCode.ORDER_NOT_FOUND
     }
 
     def "주문취소 시 재고가 복구되고 상태가 CANCELLED 로 바뀐다"() {
@@ -138,8 +139,8 @@ class OrderServiceTest extends Specification {
         orderService.cancelOrder(1L)
 
         then:
-        def e = thrown(NotFoundDataException.class)
-        e.getMessage() == "찾을 수 없는 주문입니다."
+        def e = thrown(BusinessException)
+        e.errorCode == ErrorCode.ORDER_NOT_FOUND
     }
 
     def "주문취소 시 주문 상태가 변경 완료 상태 일때 에러가 발생된다."() {
@@ -150,8 +151,8 @@ class OrderServiceTest extends Specification {
         orderService.cancelOrder(1L)
 
         then:
-        def e = thrown(IllegalArgumentException.class)
-        e.getMessage() == "변경이 불가한 상태입니다"
+        def e = thrown(BusinessException)
+        e.errorCode == ErrorCode.ORDER_STATUS_NOT_CHANGEABLE
         0 * inventoryRepository._
     }
 
@@ -190,8 +191,8 @@ class OrderServiceTest extends Specification {
         orderService.createOrder(UUID, 1L, orderCreateDto)
 
         then:
-        def e = thrown(IllegalArgumentException.class)
-        e.getMessage() == "재고 수량이 충분하지 않습니다."
+        def e = thrown(BusinessException)
+        e.errorCode == ErrorCode.OUT_OF_STOCK
     }
 
     def "createOrder는 판매중이 아닌 옵션이 섞여 있으면 주문을 저장하지 않고 거절한다"() {
@@ -206,8 +207,8 @@ class OrderServiceTest extends Specification {
         orderService.createOrder(UUID, 1L, orderCreateDto)
 
         then:
-        def e = thrown(IllegalArgumentException.class)
-        e.getMessage() == "판매 중이 아닌 상품 옵션이 포함되어 있습니다."
+        def e = thrown(BusinessException)
+        e.errorCode == ErrorCode.PRODUCT_OPTION_NOT_ON_SALE
         0 * orderRepository.save(_)
         0 * inventoryRepository._
     }
@@ -222,8 +223,8 @@ class OrderServiceTest extends Specification {
         orderService.createOrder(UUID, 1L, orderCreateDto)
 
         then:
-        def e = thrown(IllegalArgumentException.class)
-        e.getMessage() == "재고 수량이 충분하지 않습니다."
+        def e = thrown(BusinessException)
+        e.errorCode == ErrorCode.OUT_OF_STOCK
     }
 
     private static OrderSearchDto createOrderSearchDto(String startPeriod, String endPeriod) {

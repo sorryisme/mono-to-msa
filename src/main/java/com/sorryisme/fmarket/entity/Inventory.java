@@ -1,5 +1,7 @@
 package com.sorryisme.fmarket.entity;
 
+import com.sorryisme.fmarket.common.ErrorCode;
+import com.sorryisme.fmarket.exception.BusinessException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -46,7 +48,7 @@ public class Inventory extends BaseTimeEntity {
       throw new IllegalArgumentException("차감 수량은 1 이상이어야 합니다: " + amount);
     }
     if (this.quantity < amount) {
-      throw new IllegalArgumentException("재고 수량이 충분하지 않습니다.");
+      throw new BusinessException(ErrorCode.OUT_OF_STOCK);
     }
     this.quantity -= amount;
   }

@@ -9,7 +9,8 @@ import com.sorryisme.fmarket.entity.MajorCategory
 import com.sorryisme.fmarket.entity.ProductReview
 import com.sorryisme.fmarket.entity.Subcategory
 import com.sorryisme.fmarket.enums.ProductStatus
-import com.sorryisme.fmarket.exception.NotFoundDataException
+import com.sorryisme.fmarket.exception.BusinessException
+import com.sorryisme.fmarket.common.ErrorCode
 import com.sorryisme.fmarket.repository.MajorCategoryRepository
 import com.sorryisme.fmarket.repository.ProductOptionRepository
 import com.sorryisme.fmarket.repository.ProductRepository
@@ -68,8 +69,8 @@ class ProductServiceTest extends Spec {
         productService.findProductById(1L)
 
         then:
-        def e = thrown(NotFoundDataException.class)
-        e.getMessage() == "찾을 수 없는 제품입니다."
+        def e = thrown(BusinessException)
+        e.errorCode == ErrorCode.PRODUCT_NOT_FOUND
     }
 
     def "ID로 상품 조회 시 상품이 존재하면 옵션·리뷰를 합쳐 반환한다"() {
@@ -102,8 +103,8 @@ class ProductServiceTest extends Spec {
         productService.createReview(createProductReviewRequestDto(), 1L, 1L)
 
         then:
-        def e = thrown(NotFoundDataException.class)
-        e.getMessage() == "찾을 수 없는 제품입니다."
+        def e = thrown(BusinessException)
+        e.errorCode == ErrorCode.PRODUCT_NOT_FOUND
         0 * productReviewRepository.save(_)
     }
 

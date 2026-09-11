@@ -4,7 +4,8 @@ import com.sorryisme.fmarket.dto.request.CartRequestDto
 import com.sorryisme.fmarket.dto.response.CartResponseDto
 import com.sorryisme.fmarket.entity.CartDetail
 import com.sorryisme.fmarket.entity.Cart
-import com.sorryisme.fmarket.exception.NotFoundDataException
+import com.sorryisme.fmarket.exception.BusinessException
+import com.sorryisme.fmarket.common.ErrorCode
 import com.sorryisme.fmarket.repository.CartDetailRepository
 import com.sorryisme.fmarket.repository.CartRepository
 import com.sorryisme.fmarket.repository.UserRepository
@@ -25,8 +26,8 @@ class CartServiceTest extends Specification {
         cartService.addCart(createCartRequestDto(), 1L)
 
         then:
-        def e = thrown(NotFoundDataException.class)
-        e.getMessage() == "찾을 수 없는 유저입니다"
+        def e = thrown(BusinessException)
+        e.errorCode == ErrorCode.USER_NOT_FOUND
     }
 
     def "이미 장바구니가 있으면 새로 만들지 않고 그 장바구니에 담는다"() {
@@ -82,8 +83,8 @@ class CartServiceTest extends Specification {
         cartService.deleteCartDetail(1L)
 
         then:
-        def e = thrown(NotFoundDataException.class)
-        e.getMessage() == "찾을 수 없는 장바구니입니다"
+        def e = thrown(BusinessException)
+        e.errorCode == ErrorCode.CART_NOT_FOUND
     }
 
     private static CartRequestDto createCartRequestDto() {

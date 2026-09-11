@@ -1,5 +1,6 @@
 package com.sorryisme.fmarket.service;
 
+import com.sorryisme.fmarket.common.ErrorCode;
 import com.sorryisme.fmarket.dto.request.SellerRequestDto;
 import com.sorryisme.fmarket.dto.request.UserRequestDto;
 import com.sorryisme.fmarket.dto.request.UserUpdateRequestDto;
@@ -7,8 +8,7 @@ import com.sorryisme.fmarket.dto.response.SellerResponseDto;
 import com.sorryisme.fmarket.dto.response.UserResponseDto;
 import com.sorryisme.fmarket.entity.Store;
 import com.sorryisme.fmarket.entity.User;
-import com.sorryisme.fmarket.exception.DuplicateDataException;
-import com.sorryisme.fmarket.exception.NotFoundDataException;
+import com.sorryisme.fmarket.exception.BusinessException;
 import com.sorryisme.fmarket.repository.StoreRepository;
 import com.sorryisme.fmarket.repository.UserRepository;
 import com.sorryisme.fmarket.utils.PasswordCipher;
@@ -40,7 +40,7 @@ public class UserService {
     User user =
         userRepository
             .findById(userId)
-            .orElseThrow(() -> new NotFoundDataException("찾을 수 없는 유저입니다"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
     // 변경 감지로 UPDATE 가 나간다.
     user.updateProfile(
@@ -71,11 +71,11 @@ public class UserService {
   }
 
   @Transactional(readOnly = true)
-  public Long login(String loginId, String password) throws IllegalArgumentException {
+  public Long login(String loginId, String password) {
     User user =
         userRepository
             .findByLoginId(loginId)
-            .orElseThrow(() -> new IllegalArgumentException("찾을 수 없는 유저입니다."));
+            .orElseThrow(() -> new BusinessException(ErrorCode.LOGIN_FAILED));
 
     String hashedPassword = PasswordCipher.encrypt(password, user.getSalt());
 
@@ -83,13 +83,12 @@ public class UserService {
       return user.getId();
     }
 
-    throw new IllegalArgumentException("로그인정보가 일치하지 않습니다.");
+    throw new BusinessException(ErrorCode.LOGIN_FAILED);
   }
 
-  private void validateExistUser(String username, String phoneNumber)
-      throws DuplicateDataException {
+  private void validateExistUser(String username, String phoneNumber) {
     if (userRepository.existsByNameAndPhoneNumber(username, phoneNumber))
-      throw new DuplicateDataException("이미 등록된 유저입니다.");
+      throw new BusinessException(ErrorCode.DUPLICATE_USER);
   }
 
   private User saveUserByDto(UserRequestDto userRequestDto) {

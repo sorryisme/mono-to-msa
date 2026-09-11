@@ -1,10 +1,11 @@
 package com.sorryisme.fmarket.service;
 
+import com.sorryisme.fmarket.common.ErrorCode;
 import com.sorryisme.fmarket.dto.request.CartRequestDto;
 import com.sorryisme.fmarket.dto.response.CartResponseDto;
 import com.sorryisme.fmarket.entity.Cart;
 import com.sorryisme.fmarket.entity.CartDetail;
-import com.sorryisme.fmarket.exception.NotFoundDataException;
+import com.sorryisme.fmarket.exception.BusinessException;
 import com.sorryisme.fmarket.repository.CartDetailRepository;
 import com.sorryisme.fmarket.repository.CartRepository;
 import com.sorryisme.fmarket.repository.UserRepository;
@@ -23,7 +24,7 @@ public class CartService {
   @Transactional
   public CartResponseDto addCart(CartRequestDto cartRequestDto, Long userId) {
 
-    if (!userRepository.existsById(userId)) throw new NotFoundDataException("찾을 수 없는 유저입니다");
+    if (!userRepository.existsById(userId)) throw new BusinessException(ErrorCode.USER_NOT_FOUND);
 
     // 카트가 없을 경우 카트를 최초 생성
     Cart cart =
@@ -44,7 +45,7 @@ public class CartService {
     CartDetail cartDetail =
         cartDetailRepository
             .findById(id)
-            .orElseThrow(() -> new NotFoundDataException("찾을 수 없는 장바구니입니다"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.CART_NOT_FOUND));
     cartDetailRepository.delete(cartDetail);
     return id;
   }

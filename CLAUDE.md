@@ -12,6 +12,7 @@ Java 21, Spring Boot 4.1, Spring Data JPA(Hibernate), MySQL 8.4, 테스트는 Sp
 
 상세 내용은 아래 문서로 분리되어 있습니다:
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — 레이어드 아키텍처, 패키지 구성, 읽기/쓰기 DB 라우팅, 멱등성/락, 인증
+- [docs/API_RESPONSE.md](docs/API_RESPONSE.md) — API 응답 봉투 형식, HTTP 상태와 본문 `code`(ErrorCode) 계약, 예외 핸들러 매핑 (응답/예외를 건드릴 때 반드시 준수)
 - [docs/CODE_STYLE.md](docs/CODE_STYLE.md) — Spotless 포맷터, 로깅 컨벤션
 - [docs/TESTING.md](docs/TESTING.md) — Spock 테스트 관례
 - [docs/PROJECT_ANALYSIS.md](docs/PROJECT_ANALYSIS.md) — 코드베이스 분석 스냅샷
@@ -27,6 +28,7 @@ f-market/
 ├── docs/
 │   ├── ARCHITECTURE.md             # 아키텍처 상세 문서
 │   ├── PROJECT_ANALYSIS.md         # 코드베이스 분석 스냅샷
+│   ├── API_RESPONSE.md             # API 응답·오류 코드 계약
 │   ├── CODE_STYLE.md               # 포맷터, 로깅 컨벤션
 │   ├── TESTING.md                  # 테스트 관례
 │   └── HOOKS.md                    # 단계별 hook 구성
@@ -35,13 +37,13 @@ f-market/
 │   │   ├── java/com/sorryisme/fmarket/
 │   │   │   ├── annotation/         # @RequireLogin, @LoginUserId, @Idempotent, @IdempotencyKeyParam
 │   │   │   ├── aop/                # AuthenticationAspect, IdempotencyAspect
-│   │   │   ├── common/             # AppConstants, GlobalExceptionHandler, SessionManager, dto/ResponseDto
+│   │   │   ├── common/             # AppConstants, ErrorCode, SessionManager, PageableSupport, dto/ResponseDto·FieldErrorDto
 │   │   │   ├── config/             # DataSourceConfiguration, ReplicationRoutingDataSource, WebConfig
 │   │   │   ├── controller/         # Cart / Order / Product / User
 │   │   │   ├── dto/{request,response}
 │   │   │   ├── entity/             # JPA 엔티티 (BaseTimeEntity + Cart/CartDetail/IdempotencyKey/Inventory/MajorCategory/Order/OrderDetail/Product/ProductOption/ProductReview/Store/Subcategory/User)
 │   │   │   ├── enums/              # OrderStatus, UserRole
-│   │   │   ├── exception/          # DuplicateData / NotFoundData / RequireLogin / UpdateFail
+│   │   │   ├── exception/          # BusinessException(ErrorCode 보유), GlobalExceptionHandler
 │   │   │   ├── filter/             # MDCLoggingFilter
 │   │   │   ├── repository/         # Spring Data JPA 리포지토리 + ProductSpecification
 │   │   │   ├── resolver/           # LoginUserIdResolver
@@ -53,7 +55,9 @@ f-market/
 │   │       └── logback-spring.xml
 │   └── test/
 │       ├── groovy/com/sorryisme/fmarket/
+│       │   ├── controller/         # ControllerResponseContractTest (@WebMvcTest, 봉투·201·401 계약)
 │       │   ├── entity/             # EntityMappingTest (@DataJpaTest, ddl-auto=validate 로 스키마 일치 검증)
+│       │   ├── exception/          # GlobalExceptionHandlerTest (@WebMvcTest, 오류 코드 → HTTP 상태 계약)
 │       │   ├── repository/         # Repository Spock 테스트 (@DataJpaTest, 실제 MySQL)
 │       │   ├── service/            # Service Spock 테스트 (Mock 기반)
 │       │   └── testUtils/          # DomainFixture

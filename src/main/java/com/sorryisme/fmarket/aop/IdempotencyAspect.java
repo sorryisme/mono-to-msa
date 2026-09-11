@@ -1,8 +1,9 @@
 package com.sorryisme.fmarket.aop;
 
 import com.sorryisme.fmarket.annotation.IdempotencyKeyParam;
+import com.sorryisme.fmarket.common.ErrorCode;
 import com.sorryisme.fmarket.entity.IdempotencyKey;
-import com.sorryisme.fmarket.exception.DuplicateDataException;
+import com.sorryisme.fmarket.exception.BusinessException;
 import com.sorryisme.fmarket.repository.IdempotencyKeyRepository;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -50,15 +51,16 @@ public class IdempotencyAspect {
       }
     }
 
-    if (idempotencyKey == null) throw new IllegalArgumentException("Idempotency-Key 헤더가 필요합니다.");
+    if (idempotencyKey == null)
+      throw new BusinessException(ErrorCode.IDEMPOTENCY_KEY_INVALID, "Idempotency-Key 헤더가 필요합니다.");
     if (idempotencyKey.length() != 36)
-      throw new IllegalArgumentException("idempotencyKey 키는 36자리여야 합니다.");
+      throw new BusinessException(ErrorCode.IDEMPOTENCY_KEY_INVALID);
 
     // 유니크 제약 위반이 곧 중복 요청이다. 즉시 flush 해서 INSERT 결과를 이 자리에서 확정한다.
     try {
       idempotencyKeyRepository.saveAndFlush(new IdempotencyKey(idempotencyKey));
     } catch (DataIntegrityViolationException e) {
-      throw new DuplicateDataException("중복된 요청입니다.");
+      throw new BusinessException(ErrorCode.DUPLICATE_REQUEST);
     }
 
     return joinPoint.proceed();
