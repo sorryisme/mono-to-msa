@@ -157,8 +157,16 @@ bash scripts/test-affected.sh
   두 JVM 모두 `.env` 를 자동으로 읽지 않기 때문이다.
 - CI 는 워크플로에서 매 실행마다 임의 비밀번호를 생성해 주입하므로 영향 없다.
 
-프로젝트 자체 시크릿 스캐너와 pre-commit hook 은 `${VAR:default}` 패턴을 허용해
-이 경우를 잡지 못했다. 스캐너 규칙 보강을 검토할 여지가 있다.
+프로젝트 자체 시크릿 스캐너와 pre-commit hook 은 이 경우를 잡지 못했다.
+`secret-scan.sh` 의 설정 파일 규칙이 값 첫 글자가 `$` 면 환경변수 참조로 보고 통째로
+건너뛰기 때문에, 환경변수처럼 보이지만 기본값에 실제 비밀번호가 박힌 형태가 빠져나갔다.
+
+`${VAR:기본값}` 의 기본값 자리를 검사하는 규칙을 추가했다.
+
+- 잡는 것: `password: ${MYSQL_PASSWORD:실제값}` (유출됐던 형태)
+- 통과: `${MYSQL_PASSWORD}` (기본값 없음), `${MYSQL_HOST:localhost}` /
+  `${MYSQL_PORT:3306}` / `${MYSQL_USER:sorry}` 등 비밀번호 계열이 아닌 키
+- 추적 파일 139개 전체 오탐 0건 확인
 
 ## 남은 사항
 

@@ -47,6 +47,10 @@ for f in "$@"; do
     -e 'gh[pousr]_[A-Za-z0-9]{16,}'
     -e 'xox[baprs]-[A-Za-z0-9-]{10,}'
     -e "(password|passwd|secret|api[_-]?key|access[_-]?key|auth[_-]?token|client[_-]?secret)[[:space:]]*[:=][[:space:]]*[\"'][A-Za-z0-9/+=_.:@-]{8,}[\"']"
+    # ${VAR:기본값} 의 기본값 자리. 아래 "설정 파일" 규칙은 값이 $ 로 시작하면 통째로
+    # 건너뛰므로, 환경변수처럼 보이지만 실제 비밀번호가 기본값에 박혀 있는 경우를 놓친다.
+    # 값을 비우면(${VAR}) 통과한다 - 누락 시 조용히 접속하는 대신 기동 단계에서 실패한다.
+    -e '(password|passwd|secret|api[_-]?key|access[_-]?key|auth[_-]?token|client[_-]?secret)[[:space:]]*[:=][[:space:]]*\$\{[A-Za-z_][A-Za-z0-9_]*:[^}[:space:]]{4,}\}'
   )
   # 설정 파일: 따옴표 없는 key: value 형태도 검사
   case "$f" in
