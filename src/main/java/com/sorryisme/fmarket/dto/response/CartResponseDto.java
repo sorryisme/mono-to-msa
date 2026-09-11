@@ -1,20 +1,20 @@
 package com.sorryisme.fmarket.dto.response;
 
-import com.sorryisme.fmarket.domain.CartDetail;
+import com.sorryisme.fmarket.entity.CartDetail;
 import lombok.*;
 
 @Getter
 @Builder
 public class CartResponseDto {
-  private long id;
-  private long cartId;
-  private long productOptionId;
-  private int quantity;
+  private Long id;
+  private Long cartId;
+  private Long productOptionId;
+  private Integer quantity;
 
   public static CartResponseDto from(CartDetail cartDetail) {
     return CartResponseDto.builder()
         .id(cartDetail.getId())
-        .cartId(cartDetail.getCartId())
+        .cartId(cartDetail.getCart().getId())
         .productOptionId(cartDetail.getProductOptionId())
         .quantity(cartDetail.getQuantity())
         .build();

@@ -3,7 +3,7 @@ spring:
     name: fmarket
   datasource:
     # @SpringBootTest(전체 컨텍스트)는 DataSourceConfiguration 이 바인딩하는 source/replica 를 쓰고,
-    # @MybatisTest 슬라이스는 TypeExcludeFilter 로 그 @Configuration 을 제외하므로
+    # @DataJpaTest 슬라이스는 TypeExcludeFilter 로 그 @Configuration 을 제외하므로
     # DataSourceAutoConfiguration 이 읽는 아래 플랫 프로퍼티가 별도로 필요하다.
     # 이게 없으면 슬라이스가 임베디드 H2 로 폴백해 MySQL DDL 파싱에 실패한다.
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -33,9 +33,3 @@ spring:
   sql:
     init:
       mode: always
-
-mybatis:
-  mapper-locations: classpath:/mapper/**/*.xml
-  configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
-    map-underscore-to-camel-case: true

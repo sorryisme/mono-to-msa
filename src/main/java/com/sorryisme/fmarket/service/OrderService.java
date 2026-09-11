@@ -2,26 +2,29 @@ package com.sorryisme.fmarket.service;
 
 import com.sorryisme.fmarket.annotation.IdempotencyKeyParam;
 import com.sorryisme.fmarket.annotation.Idempotent;
-import com.sorryisme.fmarket.domain.Inventory;
-import com.sorryisme.fmarket.domain.Order;
-import com.sorryisme.fmarket.domain.OrderDetail;
-import com.sorryisme.fmarket.domain.ProductOption;
+import com.sorryisme.fmarket.common.PageableSupport;
 import com.sorryisme.fmarket.dto.request.OrderCreateDto;
-import com.sorryisme.fmarket.dto.request.OrderItemRequestDto;
 import com.sorryisme.fmarket.dto.request.OrderSearchDto;
-import com.sorryisme.fmarket.dto.response.OrderDetailResponseDto;
+import com.sorryisme.fmarket.dto.response.OrderListResponseDto;
 import com.sorryisme.fmarket.dto.response.OrderResponseDto;
+import com.sorryisme.fmarket.entity.Inventory;
+import com.sorryisme.fmarket.entity.Order;
+import com.sorryisme.fmarket.entity.OrderDetail;
+import com.sorryisme.fmarket.entity.ProductOption;
 import com.sorryisme.fmarket.enums.OrderStatus;
 import com.sorryisme.fmarket.exception.NotFoundDataException;
-import com.sorryisme.fmarket.mapper.InventoryMapper;
-import com.sorryisme.fmarket.mapper.OrderMapper;
-import com.sorryisme.fmarket.mapper.ProductMapper;
+import com.sorryisme.fmarket.repository.InventoryRepository;
+import com.sorryisme.fmarket.repository.OrderRepository;
+import com.sorryisme.fmarket.repository.ProductOptionRepository;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,52 +32,74 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class OrderService {
 
-  private final OrderMapper orderMapper;
-  private final InventoryMapper inventoryMapper;
-  private final ProductMapper productMapper;
+  private final OrderRepository orderRepository;
+  private final InventoryRepository inventoryRepository;
+  private final ProductOptionRepository productOptionRepository;
 
   @Transactional(readOnly = true)
-  public Page<Order> findAllOrderList(OrderSearchDto orderSearchDto) {
-    List<Order> orderList = orderMapper.findAllOrderList(orderSearchDto);
-    int total = orderMapper.countOrderList(orderSearchDto);
+  public Page<OrderListResponseDto> findAllOrderList(OrderSearchDto orderSearchDto) {
+    Pageable pageable = PageableSupport.withStableSort(orderSearchDto.getPageable());
+    Long userId = orderSearchDto.getUserId();
 
-    return new PageImpl<>(orderList, orderSearchDto.getPageable(), total);
+    Page<Order> orders;
+    if (hasPeriod(orderSearchDto)) {
+      // endPeriod 당일 주문까지 포함되도록 다음날 0시 미만으로 조회한다.
+      LocalDateTime from = LocalDate.parse(orderSearchDto.getStartPeriod()).atStartOfDay();
+      LocalDateTime to = LocalDate.parse(orderSearchDto.getEndPeriod()).plusDays(1).atStartOfDay();
+      orders = orderRepository.findByUserIdAndOrderDateIn(userId, from, to, pageable);
+    } else {
+      orders = orderRepository.findByUserId(userId, pageable);
+    }
+
+    return orders.map(OrderListResponseDto::from);
   }
 
   @Transactional(readOnly = true)
   public OrderResponseDto findOneOrder(Long id) {
-    OrderResponseDto orderResponseDto = orderMapper.findOrderById(id);
-    if (orderResponseDto == null) throw new NotFoundDataException("찾을 수 없는 주문입니다.");
+    Order order =
+        orderRepository
+            .findWithDetailsById(id)
+            .orElseThrow(() -> new NotFoundDataException("찾을 수 없는 주문입니다."));
 
-    return orderResponseDto;
+    return OrderResponseDto.from(order);
   }
 
+  @Transactional
   public Long confirmOrder(Long orderId) {
-    boolean isExistOrder = orderMapper.isExistOrderById(orderId);
-    if (!isExistOrder) throw new NotFoundDataException("찾을 수 없는 주문입니다.");
+    Order order =
+        orderRepository
+            .findById(orderId)
+            .orElseThrow(() -> new NotFoundDataException("찾을 수 없는 주문입니다."));
 
-    orderMapper.updateOrder(orderId, OrderStatus.COMPLETED.getValue());
+    order.changeStatus(OrderStatus.COMPLETED);
     return orderId;
   }
 
   @Transactional
   public Long cancelOrder(Long orderId) {
 
-    OrderResponseDto orderResponseDto = orderMapper.findOrderByIdForUpdate(orderId);
+    Order order =
+        orderRepository
+            .findByIdForUpdate(orderId)
+            .orElseThrow(() -> new NotFoundDataException("찾을 수 없는 주문입니다."));
 
-    if (orderResponseDto == null) throw new NotFoundDataException("찾을 수 없는 주문입니다.");
-    if (!OrderStatus.PENDING.getValue().equals(orderResponseDto.getStatus()))
+    if (order.getStatus() != OrderStatus.PENDING)
       throw new IllegalArgumentException("변경이 불가한 상태입니다");
 
-    List<Inventory> orderedInventories =
-        orderResponseDto.getOrderDetails().stream()
-            .map(OrderDetailResponseDto::toInventory)
-            .toList();
+    // 같은 옵션이 여러 상세에 걸쳐 있으면 수량을 합쳐 되돌린다.
+    Map<Long, Integer> restoreQuantityMap =
+        order.getOrderDetails().stream()
+            .collect(
+                Collectors.toMap(
+                    OrderDetail::getProductOptionId, OrderDetail::getQuantity, Integer::sum));
 
-    inventoryMapper.findStockQuantityForUpdate(orderedInventories);
-    orderedInventories.forEach(inventoryMapper::increaseStockQuantity);
+    inventoryRepository
+        .findAllByProductOptionIdInForUpdate(restoreQuantityMap.keySet())
+        .forEach(
+            inventory ->
+                inventory.increase(restoreQuantityMap.get(inventory.getProductOptionId())));
 
-    orderMapper.updateOrder(orderId, OrderStatus.CANCELLED.getValue());
+    order.changeStatus(OrderStatus.CANCELLED);
     return orderId;
   }
 
@@ -83,49 +108,35 @@ public class OrderService {
   public Long createOrder(
       @IdempotencyKeyParam String idempotencyKey, Long userId, OrderCreateDto orderCreateDto) {
 
-    // 1. 주문 생성
-    List<ProductOption> productOptions = getProductOptions(orderCreateDto.getOrderItems());
+    // 1. 주문 생성 (주문 상세는 cascade 로 함께 저장)
     Map<Long, Integer> requestQuantityMap = orderCreateDto.toProductQuantityMap();
+    List<ProductOption> productOptions =
+        productOptionRepository.findAllById(requestQuantityMap.keySet());
 
     Order order = Order.of(productOptions, requestQuantityMap, userId);
-    orderMapper.createOrder(order);
-    List<OrderDetail> orderDetails = order.toOrderDetails();
-    orderMapper.createOrderDetail(orderDetails);
+    orderRepository.save(order);
 
-    // 2. 재고 수량 검증 및 업데이트
-    List<Inventory> requestInventories = orderCreateDto.toInventoryList();
-    List<Inventory> savedInventories =
-        inventoryMapper.findStockQuantityForUpdate(requestInventories);
-    List<Inventory> updateInventories =
-        validateAndPrepareInventoryUpdates(savedInventories, requestInventories);
+    // 2. 재고 행 잠금 후 수량 검증·차감
+    Map<Long, Inventory> inventoryMap =
+        inventoryRepository
+            .findAllByProductOptionIdInForUpdate(requestQuantityMap.keySet())
+            .stream()
+            .collect(Collectors.toMap(Inventory::getProductOptionId, Function.identity()));
 
-    inventoryMapper.updateStockQuantity(updateInventories);
+    requestQuantityMap.forEach(
+        (productOptionId, quantity) -> {
+          Inventory inventory = inventoryMap.get(productOptionId);
+          if (inventory == null) throw new IllegalArgumentException("재고 수량이 충분하지 않습니다.");
+          inventory.decrease(quantity);
+        });
 
     return order.getId();
   }
 
-  private List<ProductOption> getProductOptions(List<OrderItemRequestDto> orderItems) {
-    List<Long> productOptionIds =
-        orderItems.stream().map(OrderItemRequestDto::getProductOptionId).toList();
-    return productMapper.findProductOptionsByIds(productOptionIds);
-  }
-
-  private List<Inventory> validateAndPrepareInventoryUpdates(
-      List<Inventory> savedInventory, List<Inventory> requestInventories) {
-    Map<Long, Integer> savedInventoryMap =
-        savedInventory.stream()
-            .collect(Collectors.toMap(Inventory::getProductOptionId, Inventory::getQuantity));
-
-    return requestInventories.stream()
-        .map(
-            requestInventory -> {
-              int savedQuantity =
-                  savedInventoryMap.getOrDefault(requestInventory.getProductOptionId(), 0);
-              int updateQuantity = savedQuantity - requestInventory.getQuantity();
-              if (updateQuantity < 0) throw new IllegalArgumentException("재고 수량이 충분하지 않습니다.");
-
-              return Inventory.of(requestInventory.getProductOptionId(), updateQuantity);
-            })
-        .toList();
+  private static boolean hasPeriod(OrderSearchDto orderSearchDto) {
+    return orderSearchDto.getStartPeriod() != null
+        && !orderSearchDto.getStartPeriod().isEmpty()
+        && orderSearchDto.getEndPeriod() != null
+        && !orderSearchDto.getEndPeriod().isEmpty();
   }
 }

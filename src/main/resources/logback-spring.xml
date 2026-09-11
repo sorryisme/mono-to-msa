@@ -8,12 +8,8 @@
         </encoder>
     </appender>
 
-    <!-- MyBatis SQL 로그 설정 -->
-    <logger name="org.mybatis" level="DEBUG" additivity="false">
-        <appender-ref ref="CONSOLE" />
-    </logger>
-
-    <logger name="org.apache.ibatis.logging" level="DEBUG" additivity="false">
+    <!-- Hibernate SQL 로그 설정 (바인딩 값은 개인정보가 섞일 수 있어 켜지 않는다) -->
+    <logger name="org.hibernate.SQL" level="DEBUG" additivity="false">
         <appender-ref ref="CONSOLE" />
     </logger>
 

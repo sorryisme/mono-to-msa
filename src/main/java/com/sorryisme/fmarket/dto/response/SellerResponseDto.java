@@ -1,7 +1,7 @@
 package com.sorryisme.fmarket.dto.response;
 
-import com.sorryisme.fmarket.domain.Store;
-import com.sorryisme.fmarket.domain.User;
+import com.sorryisme.fmarket.entity.Store;
+import com.sorryisme.fmarket.entity.User;
 import lombok.Getter;
 import lombok.experimental.SuperBuilder;
 
@@ -23,10 +23,11 @@ public class SellerResponseDto extends UserResponseDto {
         .loginId(user.getLoginId())
         .name(user.getName())
         .email(user.getEmail())
+        .phoneNumber(user.getPhoneNumber())
         .storeName(store.getStoreName())
         .businessNumber(store.getBusinessNumber())
-        .phoneNumber(store.getBusinessNumber())
         .logoUrl(store.getLogoUrl())
+        .description(store.getDescription())
         .build();
   }
 }
