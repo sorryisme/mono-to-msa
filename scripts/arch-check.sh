@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 레이어드 아키텍처의 의존 방향을 검사한다: controller -> service -> mapper -> (domain/dto)
+# 레이어드 아키텍처의 의존 방향을 검사한다: controller -> service -> repository -> (entity/dto)
 #
 #   사용:   scripts/arch-check.sh <파일> [<파일>...]   (인자 없으면 src/main 전체)
 #   종료:   0 = 통과, 1 = 금지된 의존 방향 발견
@@ -33,12 +33,12 @@ check() { # $1=경로패턴 $2=금지 import 패턴 $3=설명
 }
 
 check "/service/"    "controller"                  "service 는 controller 를 참조할 수 없습니다 (의존 방향 역전)"
-check "/mapper/"     "controller|service"          "mapper 는 controller/service 를 참조할 수 없습니다 (의존 방향 역전)"
-check "/domain/"     "controller|service|mapper"   "domain 은 상위 레이어를 참조할 수 없습니다 (단순 데이터 홀더 유지)"
-check "/dto/"        "controller|service|mapper"   "dto 는 상위 레이어를 참조할 수 없습니다"
+check "/repository/" "controller|service"          "repository 는 controller/service 를 참조할 수 없습니다 (의존 방향 역전)"
+check "/entity/"     "controller|service|repository" "entity 는 상위 레이어를 참조할 수 없습니다"
+check "/dto/"        "controller|service|repository" "dto 는 상위 레이어를 참조할 수 없습니다"
 
-# 컨트롤러가 매퍼를 직접 호출하면 service 레이어를 건너뛰는 것
-check "/controller/" "mapper"                      "controller 가 mapper 를 직접 참조합니다 - service 를 거치세요"
+# 컨트롤러가 리포지토리를 직접 호출하면 service 레이어를 건너뛰는 것
+check "/controller/" "repository"                  "controller 가 repository 를 직접 참조합니다 - service 를 거치세요"
 
 [ $found -ne 0 ] && exit 1
 exit 0

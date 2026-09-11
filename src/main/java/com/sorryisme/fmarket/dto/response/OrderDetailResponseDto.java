@@ -1,6 +1,6 @@
 package com.sorryisme.fmarket.dto.response;
 
-import com.sorryisme.fmarket.domain.Inventory;
+import com.sorryisme.fmarket.entity.OrderDetail;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
@@ -21,7 +21,14 @@ public class OrderDetailResponseDto {
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 
-  public Inventory toInventory() {
-    return Inventory.builder().productOptionId(productOptionId).quantity(quantity).build();
+  public static OrderDetailResponseDto from(OrderDetail orderDetail) {
+    return OrderDetailResponseDto.builder()
+        .id(orderDetail.getId())
+        .productOptionId(orderDetail.getProductOptionId())
+        .quantity(orderDetail.getQuantity())
+        .price(orderDetail.getPrice())
+        .createdAt(orderDetail.getCreatedAt())
+        .updatedAt(orderDetail.getUpdatedAt())
+        .build();
   }
 }

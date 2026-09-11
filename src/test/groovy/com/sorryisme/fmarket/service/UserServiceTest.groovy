@@ -1,41 +1,42 @@
 package com.sorryisme.fmarket.service
 
-import com.sorryisme.fmarket.domain.Store
-import com.sorryisme.fmarket.domain.User
 import com.sorryisme.fmarket.dto.request.SellerRequestDto
 import com.sorryisme.fmarket.dto.request.UserRequestDto
 import com.sorryisme.fmarket.dto.request.UserUpdateRequestDto
+import com.sorryisme.fmarket.entity.Store
+import com.sorryisme.fmarket.entity.User
 import com.sorryisme.fmarket.exception.DuplicateDataException
 import com.sorryisme.fmarket.exception.NotFoundDataException
-import com.sorryisme.fmarket.exception.UpdateFailException
-import com.sorryisme.fmarket.mapper.UserMapper
+import com.sorryisme.fmarket.repository.StoreRepository
+import com.sorryisme.fmarket.repository.UserRepository
+import com.sorryisme.fmarket.testUtils.DomainFixture
 import com.sorryisme.fmarket.utils.PasswordCipher
 import spock.lang.Specification
 
 class UserServiceTest extends Specification {
 
-    UserMapper userMapper = Mock()
-
+    UserRepository userRepository = Mock()
+    StoreRepository storeRepository = Mock()
+    UserService userService = new UserService(userRepository, storeRepository)
 
     def "유저 생성 시 중복된 유저를 생성하고자 하면 에러를 발생시킨다"() {
         given:
-        userMapper.isExistUser(_ as String, _ as String) >> true
-        UserService userService = new UserService(userMapper)
+        userRepository.existsByNameAndPhoneNumber(_ as String, _ as String) >> true
 
         when:
-        def requestDto = createUserRequestDto()
-        userService.createUser(requestDto)
+        userService.createUser(createUserRequestDto())
 
         then:
-        def e = thrown(DuplicateDataException.class);
+        def e = thrown(DuplicateDataException.class)
         e.getMessage() == "이미 등록된 유저입니다."
+        0 * userRepository.save(_)
     }
 
-    def "유저 생성 시 정상적으로 저장되면 저장된 정보가 리턴된다"() {
+    def "유저 생성 시 비밀번호는 해시되어 저장되고 저장된 정보가 리턴된다"() {
         given:
-        userMapper.isExistUser(_ as String, _ as String) >> false
-        userMapper.insertUser(_ as User) >> 1
-        UserService userService = new UserService(userMapper)
+        userRepository.existsByNameAndPhoneNumber(_ as String, _ as String) >> false
+        User saved = null
+        userRepository.save(_ as User) >> { User u -> saved = u; u }
 
         when:
         def requestDto = createUserRequestDto()
@@ -45,78 +46,60 @@ class UserServiceTest extends Specification {
         result.getLoginId() == requestDto.getLoginId()
         result.getEmail() == requestDto.getEmail()
         result.getName() == requestDto.getName()
+        saved.getPassword() != requestDto.getPassword()
+        saved.getPassword() == PasswordCipher.encrypt(requestDto.getPassword(), saved.getSalt())
     }
 
-
-    def "판매자 생성 시 정상적으로 저장되면 저장된 정보가 리턴된다"() {
+    def "판매자 생성 시 유저와 상점이 함께 저장되고 저장된 정보가 리턴된다"() {
         given:
-        userMapper.isExistUser(_ as String, _ as String) >> false
-        userMapper.insertUser(_ as User) >> 1
-        userMapper.insertStore(_ as Store ) >> 1
-        UserService userService = new UserService(userMapper)
+        userRepository.existsByNameAndPhoneNumber(_ as String, _ as String) >> false
+        userRepository.save(_ as User) >> { User u -> DomainFixture.createUser(10L) }
+        storeRepository.save(_ as Store) >> { Store s -> s }
 
         when:
         def requestDto = createSellerRequestDto()
         def result = userService.createSeller(requestDto)
 
         then:
-        result.getLoginId() == requestDto.getLoginId()
-        result.getEmail() == requestDto.getEmail()
-        result.getName() == requestDto.getName()
+        1 * storeRepository.save({ Store s -> s.getUserId() == 10L }) >> { Store s -> s }
+        result.getLoginId() == "testUser"
+        result.getEmail() == "test@naver.com"
+        result.getName() == "테스트유저"
+        result.getPhoneNumber() == "01012345678"
         result.getStoreName() == requestDto.getStoreName()
         result.getBusinessNumber() == requestDto.getBusinessNumber()
     }
 
     def "유저 업데이트 시 존재하지 않는 유저라면 예외를 발생시킨다"() {
         given:
-        userMapper.isExistUserById(_ as Long) >> false
-        UserService userService = new UserService(userMapper)
+        userRepository.findById(_ as Long) >> Optional.empty()
 
         when:
-        def userId = 1L
-        def updateRequestDto = createUpdateRequestDto()
-        userService.updateUser(updateRequestDto, userId)
+        userService.updateUser(createUpdateRequestDto(), 1L)
 
         then:
         def e = thrown(NotFoundDataException)
         e.getMessage() == "찾을 수 없는 유저입니다"
     }
 
-    def "유저 업데이트 시 정상적으로 수정되면 수정된 유저 ID를 반환한다"() {
+    def "유저 업데이트 시 엔티티가 수정되고 수정된 유저 ID를 반환한다"() {
         given:
-        userMapper.isExistUserById(_ as Long) >> true
-        userMapper.updateUser(_ as User) >> 1
-        UserService userService = new UserService(userMapper)
+        User user = DomainFixture.createUser(1L)
+        userRepository.findById(1L) >> Optional.of(user)
 
         when:
-        def userId = 1L
-        def updateRequestDto = createUpdateRequestDto()
-        def result = userService.updateUser(updateRequestDto, userId)
+        def result = userService.updateUser(createUpdateRequestDto(), 1L)
 
         then:
-        result == userId
-    }
-
-    def "유저 업데이트 시 수정이 실패하면 예외를 발생시킨다"() {
-        given:
-        userMapper.isExistUserById(_ as Long) >> true
-        userMapper.updateUser(_ as User) >> 0
-        UserService userService = new UserService(userMapper)
-
-        when:
-        def userId = 1L
-        def updateRequestDto = createUpdateRequestDto()
-        userService.updateUser(updateRequestDto, userId)
-
-        then:
-        def e = thrown(UpdateFailException)
-        e.getMessage() == "정보 수정에 실패했습니다."
+        result == 1L
+        user.getName() == "변경된 이름"
+        user.getEmail() == "updated_email@naver.com"
+        user.getPhoneNumber() == "01098765432"
     }
 
     def "로그인 시 유저가 없는 경우 에러를 발생시킨다"() {
         given:
-        userMapper.findUserByLoginId(_ as String) >> null
-        UserService userService = new UserService(userMapper)
+        userRepository.findByLoginId(_ as String) >> Optional.empty()
 
         when:
         userService.login("null", "1234")
@@ -128,9 +111,7 @@ class UserServiceTest extends Specification {
 
     def "로그인 시 비밀번호 틀린 경우 에러를 발생시킨다"() {
         given:
-        User user = createUser()
-        userMapper.findUserByLoginId(_ as String) >> user
-        UserService userService = new UserService(userMapper)
+        userRepository.findByLoginId(_ as String) >> Optional.of(createUser())
 
         when:
         userService.login("testUser", "1234567")
@@ -142,9 +123,7 @@ class UserServiceTest extends Specification {
 
     def "로그인 성공 시 id를 반환한다"() {
         given:
-        User user = createUser()
-        userMapper.findUserByLoginId(_ as String) >> user
-        UserService userService = new UserService(userMapper)
+        userRepository.findByLoginId(_ as String) >> Optional.of(createUser())
 
         when:
         Long id = userService.login("testUser", "xptmxm")
@@ -152,8 +131,6 @@ class UserServiceTest extends Specification {
         then:
         id == 1L
     }
-
-
 
     private static UserRequestDto createUserRequestDto() {
         return UserRequestDto.builder()
@@ -188,7 +165,7 @@ class UserServiceTest extends Specification {
     }
 
     private static User createUser() {
-        var salt = PasswordCipher.getSalt();
+        def salt = PasswordCipher.getSalt()
         return User.builder()
                 .id(1L)
                 .loginId("testUser")
@@ -199,6 +176,4 @@ class UserServiceTest extends Specification {
                 .phoneNumber("01012345678")
                 .build()
     }
-
-
 }

@@ -1,6 +1,5 @@
 package com.sorryisme.fmarket.dto.request;
 
-import com.sorryisme.fmarket.domain.Inventory;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
@@ -26,11 +25,5 @@ public class OrderCreateDto {
         .collect(
             Collectors.toMap(
                 OrderItemRequestDto::getProductOptionId, OrderItemRequestDto::getQuantity));
-  }
-
-  public List<Inventory> toInventoryList() {
-    return orderItems.stream()
-        .map(orderItem -> Inventory.of(orderItem.getProductOptionId(), orderItem.getQuantity()))
-        .toList();
   }
 }

@@ -6,7 +6,7 @@ OS - Window 11
 
 ## 프로젝트 개요
 이 프로젝트는 Spring Boot 기반 이커머스 백엔드입니다 (장바구니/주문/상품/유저).
-Java 21, Spring Boot 3.3.5, MyBatis(JPA 미사용), MySQL 8.4, 테스트는 Spock 사용
+Java 21, Spring Boot 4.1, Spring Data JPA(Hibernate), MySQL 8.4, 테스트는 Spock 사용
 
 ## 문서 구성
 
@@ -38,23 +38,23 @@ f-market/
 │   │   │   ├── common/             # AppConstants, GlobalExceptionHandler, SessionManager, dto/ResponseDto
 │   │   │   ├── config/             # DataSourceConfiguration, ReplicationRoutingDataSource, WebConfig
 │   │   │   ├── controller/         # Cart / Order / Product / User
-│   │   │   ├── domain/             # Cart, CartDetail, Inventory, Order, OrderDetail, Product, ProductOption, ProductReview, Store, User
 │   │   │   ├── dto/{request,response}
-│   │   │   ├── enums/              # OrderStatus
+│   │   │   ├── entity/             # JPA 엔티티 (BaseTimeEntity + Cart/CartDetail/IdempotencyKey/Inventory/MajorCategory/Order/OrderDetail/Product/ProductOption/ProductReview/Store/Subcategory/User)
+│   │   │   ├── enums/              # OrderStatus, UserRole
 │   │   │   ├── exception/          # DuplicateData / NotFoundData / RequireLogin / UpdateFail
 │   │   │   ├── filter/             # MDCLoggingFilter
-│   │   │   ├── mapper/             # MyBatis 매퍼 인터페이스 (Cart/Idempotency/Inventory/MajorCategory/Order/Product/User)
+│   │   │   ├── repository/         # Spring Data JPA 리포지토리 + ProductSpecification
 │   │   │   ├── resolver/           # LoginUserIdResolver
 │   │   │   ├── service/            # Cart / Order / Product / User
 │   │   │   └── utils/              # PasswordCipher
 │   │   └── resources/
-│   │       ├── mapper/*.xml        # MyBatis SQL 매핑
 │   │       ├── application.yml
 │   │       ├── schema.sql / data.sql
 │   │       └── logback-spring.xml
 │   └── test/
 │       ├── groovy/com/sorryisme/fmarket/
-│       │   ├── mapper/             # Mapper Spock 테스트 (@MybatisTest, 실제 MySQL)
+│       │   ├── entity/             # EntityMappingTest (@DataJpaTest, ddl-auto=validate 로 스키마 일치 검증)
+│       │   ├── repository/         # Repository Spock 테스트 (@DataJpaTest, 실제 MySQL)
 │       │   ├── service/            # Service Spock 테스트 (Mock 기반)
 │       │   └── testUtils/          # DomainFixture
 │       ├── java/                   # FmarketApplicationTests (스모크 테스트)
@@ -74,5 +74,6 @@ f-market/
 
 ## 작업 후 산출물 작업
 - 지시한 코드 작업 이후 산출물을 작성하여 DOCS에 추가한다. 해당 작업 내용이 간단한 문서 작업이거나 오타, 변경사항이 적을 경우 따로 산출물로 작성하지 않는다
-- 산출물 작성 시 docs/logs/{년월일}/{yyyy-MM-dd}-{작업제목}.md 형태로 저장한다.
+- 산출물 작성 시 docs/logs/{년월일}/{순서}-{작업제목}.md 형태로 저장한다.
+- 기존 로그가 없거나 순서가 없을 경우 1번부터 시작하며, 기존 순서가 있는경우 기존 순서에 1씩 더해 순서에 표기한다 
 - 작성 전 반드시 해당 날짜의 docs/logs/{년월일}/ 폴더가 존재하는지 확인하고, 없으면 새로 생성한 뒤 그 안에 추가/이동한다. docs/logs/ 루트에 날짜 파일을 직접 두지 않는다.

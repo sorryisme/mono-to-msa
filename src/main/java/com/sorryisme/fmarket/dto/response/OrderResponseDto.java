@@ -1,5 +1,6 @@
 package com.sorryisme.fmarket.dto.response;
 
+import com.sorryisme.fmarket.entity.Order;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,4 +23,17 @@ public class OrderResponseDto {
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
   private List<OrderDetailResponseDto> orderDetails;
+
+  public static OrderResponseDto from(Order order) {
+    return OrderResponseDto.builder()
+        .id(order.getId())
+        .userId(order.getUserId())
+        .status(order.getStatus().name())
+        .totalAmount(order.getTotalAmount())
+        .orderDate(order.getOrderDate())
+        .createdAt(order.getCreatedAt())
+        .updatedAt(order.getUpdatedAt())
+        .orderDetails(order.getOrderDetails().stream().map(OrderDetailResponseDto::from).toList())
+        .build();
+  }
 }

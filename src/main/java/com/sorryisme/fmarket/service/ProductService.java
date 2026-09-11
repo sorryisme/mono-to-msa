@@ -1,18 +1,24 @@
 package com.sorryisme.fmarket.service;
 
-import com.sorryisme.fmarket.domain.Product;
-import com.sorryisme.fmarket.domain.ProductReview;
+import com.sorryisme.fmarket.common.PageableSupport;
 import com.sorryisme.fmarket.dto.request.ProductReviewRequestDto;
 import com.sorryisme.fmarket.dto.request.ProductSearchDto;
 import com.sorryisme.fmarket.dto.response.MajorCategoryResponse;
+import com.sorryisme.fmarket.dto.response.ProductListResponseDto;
 import com.sorryisme.fmarket.dto.response.ProductResponseDto;
+import com.sorryisme.fmarket.dto.response.ProductReviewResponseDto;
+import com.sorryisme.fmarket.entity.Product;
+import com.sorryisme.fmarket.entity.ProductReview;
+import com.sorryisme.fmarket.enums.ProductStatus;
 import com.sorryisme.fmarket.exception.NotFoundDataException;
-import com.sorryisme.fmarket.mapper.MajorCategoryMapper;
-import com.sorryisme.fmarket.mapper.ProductMapper;
+import com.sorryisme.fmarket.repository.MajorCategoryRepository;
+import com.sorryisme.fmarket.repository.ProductOptionRepository;
+import com.sorryisme.fmarket.repository.ProductRepository;
+import com.sorryisme.fmarket.repository.ProductReviewRepository;
+import com.sorryisme.fmarket.repository.ProductSpecification;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,37 +26,47 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ProductService {
 
-  private final MajorCategoryMapper majorCategoryMapper;
-  private final ProductMapper productMapper;
+  private final MajorCategoryRepository majorCategoryRepository;
+  private final ProductRepository productRepository;
+  private final ProductOptionRepository productOptionRepository;
+  private final ProductReviewRepository productReviewRepository;
 
   @Transactional(readOnly = true)
   public List<MajorCategoryResponse> findMajorCategoryList() {
-    return this.majorCategoryMapper.findMajorCategoryList();
+    return majorCategoryRepository.findAllWithSubcategories().stream()
+        .map(MajorCategoryResponse::from)
+        .toList();
   }
 
   @Transactional(readOnly = true)
-  public Page<Product> findAllProductList(ProductSearchDto productSearchDto) {
-
-    List<Product> productList = productMapper.findAllProductList(productSearchDto);
-    int total = productMapper.countProducts(productSearchDto);
-
-    return new PageImpl<>(productList, productSearchDto.getPageable(), total);
+  public Page<ProductListResponseDto> findAllProductList(ProductSearchDto productSearchDto) {
+    return productRepository
+        .findAll(
+            ProductSpecification.search(productSearchDto),
+            PageableSupport.withStableSort(productSearchDto.getPageable()))
+        .map(ProductListResponseDto::from);
   }
 
+  /** 삭제된 상품은 404 로 취급한다. 판매중지 상품은 상세를 보여주되 옵션도 삭제된 것만 뺀다. */
   @Transactional(readOnly = true)
   public ProductResponseDto findProductById(Long id) {
+    Product product =
+        productRepository
+            .findByIdAndStatusNot(id, ProductStatus.DELETED)
+            .orElseThrow(() -> new NotFoundDataException("찾을 수 없는 제품입니다."));
 
-    ProductResponseDto productResponseDto = productMapper.findOneProductById(id);
-    if (productResponseDto == null) throw new NotFoundDataException("찾을 수 없는 제품입니다.");
-
-    return productResponseDto;
+    return ProductResponseDto.of(
+        product,
+        productOptionRepository.findAllByProductIdAndStatusNot(id, ProductStatus.DELETED),
+        productReviewRepository.findAllByProductId(id));
   }
 
-  public ProductReview createReview(
+  @Transactional
+  public ProductReviewResponseDto createReview(
       ProductReviewRequestDto reviewRequestDto, Long productId, Long userId) {
 
-    boolean isExistProduct = productMapper.isExistProductById(productId);
-    if (!isExistProduct) throw new NotFoundDataException("찾을 수 없는 제품입니다.");
+    if (!productRepository.existsByIdAndStatusNot(productId, ProductStatus.DELETED))
+      throw new NotFoundDataException("찾을 수 없는 제품입니다.");
 
     ProductReview productReview =
         ProductReview.builder()
@@ -60,7 +76,6 @@ public class ProductService {
             .rating(reviewRequestDto.getRating())
             .build();
 
-    productMapper.insertProductReview(productReview);
-    return productReview;
+    return ProductReviewResponseDto.from(productReviewRepository.save(productReview));
   }
 }

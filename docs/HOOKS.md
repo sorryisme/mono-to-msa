@@ -18,7 +18,7 @@
 |---|---|---|
 | `scripts/hook-lib.sh` | 공통 헬퍼 (JSON 파싱, 상태 마커) | 전부 |
 | `scripts/guard-scan.sh` | 금지 패턴 (`System.out`, 빈 catch, 테스트 skip, 자격증명) | PostToolUse, pre-commit, CI |
-| `scripts/arch-check.sh` | 의존 방향 (controller → service → mapper) | PostToolUse, pre-commit, CI |
+| `scripts/arch-check.sh` | 의존 방향 (controller → service → repository) | PostToolUse, pre-commit, CI |
 | `scripts/secret-scan.sh` | 시크릿·1MB 초과 파일 | pre-commit, CI |
 | `scripts/lint-changed.sh` | pre-commit 묶음 | pre-commit |
 | `scripts/test-affected.sh` | pre-push 묶음 | pre-push, Stop 검증 |
@@ -49,9 +49,9 @@ bash scripts/verify-full.sh             # CI 와 동일한 전체 검증
 
 `arch-check.sh` — 금지된 import 방향
 - `service` → `controller`
-- `mapper` → `controller` / `service`
-- `domain`, `dto` → 상위 레이어
-- `controller` → `mapper` (service 를 건너뜀)
+- `repository` → `controller` / `service`
+- `entity`, `dto` → 상위 레이어
+- `controller` → `repository` (service 를 건너뜀)
 
 ## 예외 처리
 

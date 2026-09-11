@@ -1,6 +1,6 @@
 package com.sorryisme.fmarket.dto.response;
 
-import com.sorryisme.fmarket.domain.User;
+import com.sorryisme.fmarket.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

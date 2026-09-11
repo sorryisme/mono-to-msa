@@ -36,9 +36,9 @@ jv=$(java -version 2>&1 | head -1)
 add "- Java: ${jv:-확인 불가} (프로젝트 요구: 21)"
 
 if (exec 3<>/dev/tcp/127.0.0.1/3306) 2>/dev/null; then
-  add "- MySQL localhost:3306: 접속 가능 → 매퍼 테스트(@MybatisTest) 실행 가능"
+  add "- MySQL localhost:3306: 접속 가능 → 리포지토리 테스트(@DataJpaTest) 실행 가능"
 else
-  add "- MySQL localhost:3306: 접속 불가 → 매퍼 테스트는 실패합니다. 필요하면 \`docker compose up -d db-master db-replica\`"
+  add "- MySQL localhost:3306: 접속 불가 → 리포지토리/엔티티 테스트는 실패합니다. 필요하면 \`docker compose up -d db-master db-replica\`"
 fi
 
 [ -f "$PROJECT_DIR/.env" ] && add "- .env: 존재" || add "- .env: 없음 (.env-example 참고해서 만들어야 할 수 있음)"

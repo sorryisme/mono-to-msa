@@ -1,105 +1,119 @@
 package com.sorryisme.fmarket.service
 
-import com.sorryisme.fmarket.domain.Product
-import com.sorryisme.fmarket.domain.ProductReview
 import com.sorryisme.fmarket.dto.request.ProductReviewRequestDto
 import com.sorryisme.fmarket.dto.request.ProductSearchDto
-import com.sorryisme.fmarket.dto.response.MajorCategoryResponse
-import com.sorryisme.fmarket.dto.response.ProductOptionResponseDto
+import com.sorryisme.fmarket.dto.response.ProductListResponseDto
 import com.sorryisme.fmarket.dto.response.ProductResponseDto
 import com.sorryisme.fmarket.dto.response.ProductReviewResponseDto
-import com.sorryisme.fmarket.dto.response.SubcategoryResponse
+import com.sorryisme.fmarket.entity.MajorCategory
+import com.sorryisme.fmarket.entity.ProductReview
+import com.sorryisme.fmarket.entity.Subcategory
+import com.sorryisme.fmarket.enums.ProductStatus
 import com.sorryisme.fmarket.exception.NotFoundDataException
-import com.sorryisme.fmarket.mapper.MajorCategoryMapper
-import com.sorryisme.fmarket.mapper.ProductMapper
+import com.sorryisme.fmarket.repository.MajorCategoryRepository
+import com.sorryisme.fmarket.repository.ProductOptionRepository
+import com.sorryisme.fmarket.repository.ProductRepository
+import com.sorryisme.fmarket.repository.ProductReviewRepository
 import com.sorryisme.fmarket.testUtils.DomainFixture
 import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.Pageable
-import spock.lang.Specification
+import org.springframework.data.jpa.domain.Specification
+import spock.lang.Specification as Spec
 
-import java.time.LocalDateTime
+class ProductServiceTest extends Spec {
 
-class ProductServiceTest extends Specification {
+    ProductRepository productRepository = Mock()
+    MajorCategoryRepository majorCategoryRepository = Mock()
+    ProductOptionRepository productOptionRepository = Mock()
+    ProductReviewRepository productReviewRepository = Mock()
+    ProductService productService = new ProductService(
+            majorCategoryRepository, productRepository, productOptionRepository, productReviewRepository)
 
-
-    ProductMapper productMapper = Mock();
-    MajorCategoryMapper majorCategoryMapper = Mock();
-    ProductService productService = new ProductService(majorCategoryMapper, productMapper)
-
-    def "카테고리 조회 시 모든 카테고리가 조회된다"() {
+    def "카테고리 조회 시 대분류와 중분류가 모두 응답 DTO 로 변환된다"() {
         given:
-        def majorCategory = createMockMajorCategoryList()
-        majorCategoryMapper.findMajorCategoryList() >> [majorCategory]
+        MajorCategory major = MajorCategory.builder().id(1L).categoryName("대분류").description("대분류 설명").build()
+        major.addSubcategory(Subcategory.builder().id(1L).categoryName("중분류1").build())
+        major.addSubcategory(Subcategory.builder().id(2L).categoryName("중분류2").build())
+        majorCategoryRepository.findAllWithSubcategories() >> [major]
 
         when:
-        def majCategoryList = productService.findMajorCategoryList()
+        def majorCategoryList = productService.findMajorCategoryList()
 
         then:
-        majCategoryList.size() == 1
-        majorCategory.getSubcategories().size() == 2
+        majorCategoryList.size() == 1
+        majorCategoryList[0].getMajorCategoryName() == "대분류"
+        majorCategoryList[0].getSubcategories().size() == 2
+        majorCategoryList[0].getSubcategories()[0].getMajorCategoryId() == 1L
     }
 
     def "모든 상품 리스트와 총 상품 개수를 조회한다"() {
         given:
-        def product = DomainFixture.createProduct();
-        productMapper.findAllProductList(_ as ProductSearchDto) >> [product];
-        productMapper.countProducts(_ as ProductSearchDto) >> 1;
+        productRepository.findAll(_ as Specification, _ as Pageable) >> new PageImpl<>([DomainFixture.createProduct()])
 
         when:
-        Page<Product> result = productService.findAllProductList(createProductSearchDto());
+        Page<ProductListResponseDto> result = productService.findAllProductList(createProductSearchDto())
 
         then:
         result.getContent().size() == 1
+        result.getContent()[0].getProductName() == "제품명1"
         result.getTotalElements() == 1
     }
 
-    def "ID로 상품 조회 시 존재하지 않으면 예외가 발생한다"() {
+    def "ID로 상품 조회 시 존재하지 않거나 삭제됐으면 예외가 발생한다"() {
         given:
-        productMapper.findOneProductById(1L) >> null;
+        productRepository.findByIdAndStatusNot(1L, ProductStatus.DELETED) >> Optional.empty()
 
         when:
-        productService.findProductById(1L);
+        productService.findProductById(1L)
 
         then:
         def e = thrown(NotFoundDataException.class)
         e.getMessage() == "찾을 수 없는 제품입니다."
     }
 
-    def "ID로 상품 조회 시 상품이 존재하면 데이터를 반환한다"() {
+    def "ID로 상품 조회 시 상품이 존재하면 옵션·리뷰를 합쳐 반환한다"() {
         given:
-        productMapper.findOneProductById(1L) >> createProductResponseDto();
+        productRepository.findByIdAndStatusNot(1L, ProductStatus.DELETED) >> Optional.of(DomainFixture.createProduct())
+        productOptionRepository.findAllByProductIdAndStatusNot(1L, ProductStatus.DELETED) >> [
+                DomainFixture.createProductOption(101L, 1L, "옵션 1", "4500"),
+                DomainFixture.createProductOption(102L, 1L, "옵션 2", "6500")
+        ]
+        productReviewRepository.findAllByProductId(1L) >> [
+                DomainFixture.createProductReview(1001L),
+                DomainFixture.createProductReview(1002L)
+        ]
 
         when:
-        ProductResponseDto result = productService.findProductById(1L);
+        ProductResponseDto result = productService.findProductById(1L)
 
         then:
         result.getId() == 1L
-        result.getDescription() == "상품 설명"
+        result.getDescription() == "상품설명"
         result.getOptions().size() == 2
         result.getReviews().size() == 2
     }
 
-    def "리뷰 생성 시 상품이 존재하지 않으면 예외가 발생한다"() {
+    def "리뷰 생성 시 상품이 존재하지 않거나 삭제됐으면 예외가 발생한다"() {
         given:
-        productMapper.isExistProductById(1L) >> false
-        def reviewRequestDto = createProductReviewRequestDto()
-
+        productRepository.existsByIdAndStatusNot(1L, ProductStatus.DELETED) >> false
 
         when:
-        productService.createReview(reviewRequestDto, 1L, 1L)
+        productService.createReview(createProductReviewRequestDto(), 1L, 1L)
 
         then:
         def e = thrown(NotFoundDataException.class)
         e.getMessage() == "찾을 수 없는 제품입니다."
+        0 * productReviewRepository.save(_)
     }
 
     def "리뷰 생성 시 성공적으로 저장된다"() {
         given:
-        productMapper.isExistProductById(1L) >> true;
-        def reviewRequestDto = createProductReviewRequestDto()
+        productRepository.existsByIdAndStatusNot(1L, ProductStatus.DELETED) >> true
+        productReviewRepository.save(_ as ProductReview) >> { ProductReview r -> r }
 
         when:
-        ProductReview result = productService.createReview(reviewRequestDto, 1L, 1L);
+        ProductReviewResponseDto result = productService.createReview(createProductReviewRequestDto(), 1L, 1L)
 
         then:
         result.getProductId() == 1L
@@ -108,37 +122,11 @@ class ProductServiceTest extends Specification {
         result.getRating() == 5
     }
 
-
-    private static MajorCategoryResponse createMockMajorCategoryList() {
-        def subCategory = SubcategoryResponse.builder()
-                .subcategoryId(1)
-                .majorCategoryId(1)
-                .categoryName("중분류")
-                .categoryName("중분류 설명")
-                .build();
-
-        def subCategory2 = SubcategoryResponse.builder()
-                .subcategoryId(2)
-                .majorCategoryId(1)
-                .categoryName("중분류")
-                .categoryName("중분류 설명")
-                .build();
-
-        return MajorCategoryResponse.builder()
-                .majorCategoryId(1)
-                .majorCategoryName("대분류")
-                .description("대분류 설명")
-                .subcategories([subCategory, subCategory2])
-                .build()
-    }
-
     private static ProductSearchDto createProductSearchDto() {
-        def productSearchDto = ProductSearchDto.builder()
+        return ProductSearchDto.builder()
                 .pageable(Pageable.ofSize(10))
                 .query("")
                 .build()
-
-        return productSearchDto
     }
 
     private static ProductReviewRequestDto createProductReviewRequestDto() {
@@ -146,55 +134,6 @@ class ProductServiceTest extends Specification {
                 .productId(1L)
                 .reviewText("리뷰 작성 DTO")
                 .rating(5)
-                .build();
-    }
-
-    private static ProductResponseDto createProductResponseDto() {
-
-        def options = List.of(
-                ProductOptionResponseDto.builder()
-                        .id(101L)
-                        .optionName("옵션 1")
-                        .originPrice(new BigDecimal("5000"))
-                        .salePrice(new BigDecimal("4500"))
-                        .build(),
-                ProductOptionResponseDto.builder()
-                        .id(102L)
-                        .optionName("옵션 2")
-                        .originPrice(new BigDecimal("7000"))
-                        .salePrice(new BigDecimal("6500"))
-                        .build()
-        )
-
-        def reviews = List.of(
-                ProductReviewResponseDto.builder()
-                        .reviewId(201L)
-                        .productId(1L)
-                        .userId(1001L)
-                        .rating(5)
-                        .reviewText("최고의 제품입니다.")
-                        .createdAt(LocalDateTime.now())
-                        .build(),
-                ProductReviewResponseDto.builder()
-                        .reviewId(202L)
-                        .productId(1L)
-                        .userId(1002L)
-                        .rating(4)
-                        .reviewText("좋은 제품입니다.")
-                        .createdAt(LocalDateTime.now())
-                        .build()
-        )
-
-        return ProductResponseDto.builder()
-                .id(1L)
-                .description("상품 설명")
-                .thumbnail("썸네일 이미지 URL")
-                .catalog("카탈로그 정보")
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .options(options)
-                .reviews(reviews)
                 .build()
     }
-
 }

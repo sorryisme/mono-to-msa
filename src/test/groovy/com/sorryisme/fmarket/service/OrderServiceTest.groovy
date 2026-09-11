@@ -1,21 +1,22 @@
 package com.sorryisme.fmarket.service
 
-import com.sorryisme.fmarket.domain.Inventory
-import com.sorryisme.fmarket.domain.Order
-import com.sorryisme.fmarket.domain.OrderDetail
-import com.sorryisme.fmarket.domain.ProductOption
 import com.sorryisme.fmarket.dto.request.OrderCreateDto
 import com.sorryisme.fmarket.dto.request.OrderItemRequestDto
 import com.sorryisme.fmarket.dto.request.OrderSearchDto
-import com.sorryisme.fmarket.dto.response.OrderDetailResponseDto
+import com.sorryisme.fmarket.dto.response.OrderListResponseDto
 import com.sorryisme.fmarket.dto.response.OrderResponseDto
+import com.sorryisme.fmarket.entity.Inventory
+import com.sorryisme.fmarket.entity.Order
+import com.sorryisme.fmarket.entity.ProductOption
 import com.sorryisme.fmarket.enums.OrderStatus
+import com.sorryisme.fmarket.enums.ProductStatus
 import com.sorryisme.fmarket.exception.NotFoundDataException
-import com.sorryisme.fmarket.mapper.InventoryMapper
-import com.sorryisme.fmarket.mapper.OrderMapper
-import com.sorryisme.fmarket.mapper.ProductMapper
+import com.sorryisme.fmarket.repository.InventoryRepository
+import com.sorryisme.fmarket.repository.OrderRepository
+import com.sorryisme.fmarket.repository.ProductOptionRepository
 import com.sorryisme.fmarket.testUtils.DomainFixture
 import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.Pageable
 import spock.lang.Specification
 
@@ -23,92 +24,87 @@ import java.time.LocalDateTime
 
 class OrderServiceTest extends Specification {
 
-    OrderMapper orderMapper = Mock()
-    InventoryMapper inventoryMapper = Mock()
-    ProductMapper productMapper = Mock()
-    OrderService orderService = new OrderService(orderMapper, inventoryMapper, productMapper)
+    OrderRepository orderRepository = Mock()
+    InventoryRepository inventoryRepository = Mock()
+    ProductOptionRepository productOptionRepository = Mock()
+    OrderService orderService = new OrderService(orderRepository, inventoryRepository, productOptionRepository)
 
-    OrderCreateDto orderCreateDto
     List<ProductOption> productOptions
     List<Inventory> inventories
 
     private static final String UUID = "166f9067-2e5f-4932-e314-f438ae846d24"
 
     def setup() {
-        orderCreateDto = new OrderCreateDto([
-                new OrderItemRequestDto(1L, 3),
-                new OrderItemRequestDto(2L, 2)
-        ])
-
         productOptions = [
-                new ProductOption(1L, 101L, "Option1", new BigDecimal("1000.00"), new BigDecimal("900.00"), LocalDateTime.now(), LocalDateTime.now()),
-                new ProductOption(2L, 102L, "Option2", new BigDecimal("2000.00"), new BigDecimal("1800.00"), LocalDateTime.now(), LocalDateTime.now())
+                DomainFixture.createProductOption(1L, 101L, "Option1", "900.00"),
+                DomainFixture.createProductOption(2L, 102L, "Option2", "1800.00")
         ]
-
         inventories = DomainFixture.createInventories()
     }
 
-
-    def "dto 제공되면 페이징 정보가 포함된 주문정보가 전달된다"() {
-
+    def "기간 조건이 있으면 기간 조회 메서드로, 없으면 사용자 기준으로 페이징 조회한다"() {
         given:
-        OrderSearchDto orderSearchDto = createOrderSearchDto()
-        List<Order> orders = [DomainFixture.createOrder()]
-        orderSearchDto.getPageable() >> Pageable.ofSize(10)
-        orderMapper.findAllOrderList(orderSearchDto) >> orders
-        orderMapper.countOrderList(orderSearchDto) >> orders.size()
+        OrderSearchDto orderSearchDto = createOrderSearchDto(startPeriod, endPeriod)
+        Page<Order> page = new PageImpl<>([DomainFixture.createOrder(1L, OrderStatus.PENDING)])
 
         when:
-        Page<Order> result = orderService.findAllOrderList(orderSearchDto)
+        Page<OrderListResponseDto> result = orderService.findAllOrderList(orderSearchDto)
 
         then:
-        result.getContent().size() == orders.size()
-        result.getTotalElements() == orders.size()
+        periodCalls * orderRepository.findByUserIdAndOrderDateIn(1L, LocalDateTime.of(2025, 1, 1, 0, 0), LocalDateTime.of(2026, 1, 1, 0, 0), _ as Pageable) >> page
+        plainCalls * orderRepository.findByUserId(1L, _ as Pageable) >> page
+        result.getContent().size() == 1
+        result.getContent().get(0).getStatus() == "PENDING"
+
+        where:
+        startPeriod  | endPeriod    | periodCalls | plainCalls
+        "2025-01-01" | "2025-12-31" | 1           | 0
+        null         | null         | 0           | 1
+        ""           | ""           | 0           | 1
     }
 
-    def "ID로 주문 조회 시 존재하면 데이터를 반환한다"() {
+    def "ID로 주문 조회 시 존재하면 상세를 포함한 데이터를 반환한다"() {
         given:
-        OrderResponseDto orderResponseDto = createOrderResponseDto()
-        orderMapper.findOrderById(_ as Long) >> orderResponseDto
+        orderRepository.findWithDetailsById(1L) >> Optional.of(DomainFixture.createOrder(1L, OrderStatus.PENDING))
 
         when:
         OrderResponseDto result = orderService.findOneOrder(1L)
 
         then:
-        result.getId() == orderResponseDto.getId()
-        result.getUserId() == orderResponseDto.getUserId()
-        result.getTotalAmount() == orderResponseDto.getTotalAmount()
-        result.getOrderDetails().size() >= 1
+        result.getId() == 1L
+        result.getUserId() == 1L
+        result.getTotalAmount() == new BigDecimal(10000)
+        result.getOrderDetails().size() == 1
     }
 
     def "주문 조회시 주문이 존재하지 않으면 예외가 발생한다"() {
         given:
-        orderMapper.findOrderById(_ as Long) >> null
+        orderRepository.findWithDetailsById(_ as Long) >> Optional.empty()
 
         when:
-        OrderResponseDto result = orderService.findOneOrder(1L)
+        orderService.findOneOrder(1L)
 
         then:
         def e = thrown(NotFoundDataException.class)
         e.getMessage() == "찾을 수 없는 주문입니다."
     }
 
-    def "주문 확정 시 정상적으로 확정되면 orderId가 리턴된다"() {
+    def "주문 확정 시 상태가 COMPLETED 로 바뀌고 orderId가 리턴된다"() {
         given:
-        orderMapper.isExistOrderById(_ as Long) >> true
-        orderMapper.updateOrder(1L, _ as String) >> 1L
+        Order order = DomainFixture.createOrder(1L, OrderStatus.PENDING)
+        orderRepository.findById(1L) >> Optional.of(order)
 
         when:
         Long result = orderService.confirmOrder(1L)
 
         then:
         result == 1L
+        order.getStatus() == OrderStatus.COMPLETED
     }
 
     def "주문 확정 시 주문이 없을 경우 에러가 발생한다"() {
         given:
-        orderMapper.isExistOrderById(_ as Long) >> false
-        orderMapper.updateOrder(1L, _ as String) >> 1L
+        orderRepository.findById(_ as Long) >> Optional.empty()
 
         when:
         orderService.confirmOrder(1L)
@@ -118,31 +114,28 @@ class OrderServiceTest extends Specification {
         e.getMessage() == "찾을 수 없는 주문입니다."
     }
 
-
-    def "주문취소 시 정상적으로 orderId를 리턴한다"() {
+    def "주문취소 시 재고가 복구되고 상태가 CANCELLED 로 바뀐다"() {
         given:
-        Long orderId = 1L
-        OrderResponseDto orderResponseDto = createOrderResponseDto()
-
-        orderMapper.findOrderByIdForUpdate(orderId) >> orderResponseDto
-        inventoryMapper.findStockQuantityForUpdate(_ as List<Inventory>) >> [Mock(Inventory)]
-        inventoryMapper.increaseStockQuantity(_ as Inventory) >> 1
-        orderMapper.updateOrder(orderId, OrderStatus.CANCELLED.getValue()) >> 1
+        Order order = DomainFixture.createOrder(1L, OrderStatus.PENDING)
+        Inventory inventory = DomainFixture.createInventory(1L, 3)
+        orderRepository.findByIdForUpdate(1L) >> Optional.of(order)
+        inventoryRepository.findAllByProductOptionIdInForUpdate({ it.contains(1L) }) >> [inventory]
 
         when:
-        Long result = orderService.cancelOrder(orderId)
+        Long result = orderService.cancelOrder(1L)
 
         then:
-        result == orderId
+        result == 1L
+        order.getStatus() == OrderStatus.CANCELLED
+        inventory.getQuantity() == 3 + 5
     }
 
     def "주문취소 시 주문이 없을 경우 에러를 발생시킨다"() {
         given:
-        Long orderId = 1L
-        orderMapper.findOrderByIdForUpdate(orderId) >> null
+        orderRepository.findByIdForUpdate(1L) >> Optional.empty()
 
         when:
-        orderService.cancelOrder(orderId)
+        orderService.cancelOrder(1L)
 
         then:
         def e = thrown(NotFoundDataException.class)
@@ -151,50 +144,47 @@ class OrderServiceTest extends Specification {
 
     def "주문취소 시 주문 상태가 변경 완료 상태 일때 에러가 발생된다."() {
         given:
-        Long orderId = 1L
-        OrderResponseDto orderResponseDto = Mock()
-        orderResponseDto.getStatus() >> OrderStatus.COMPLETED.getValue()
-
-        orderMapper.findOrderByIdForUpdate(orderId) >> orderResponseDto
+        orderRepository.findByIdForUpdate(1L) >> Optional.of(DomainFixture.createOrder(1L, OrderStatus.COMPLETED))
 
         when:
-        orderService.cancelOrder(orderId)
+        orderService.cancelOrder(1L)
 
         then:
         def e = thrown(IllegalArgumentException.class)
         e.getMessage() == "변경이 불가한 상태입니다"
+        0 * inventoryRepository._
     }
 
-
-    def "createOrder는 주문을 생성하고 재고를 업데이트한다"() {
+    def "createOrder는 주문을 저장하고 재고를 차감한다"() {
         given:
-        orderCreateDto = new OrderCreateDto([
+        OrderCreateDto orderCreateDto = new OrderCreateDto([
                 new OrderItemRequestDto(1L, 1),
                 new OrderItemRequestDto(2L, 2)
         ])
-
-        productMapper.findProductOptionsByIds(_ as List<Long>) >> productOptions
-        inventoryMapper.findStockQuantityForUpdate(_ as List<Inventory>) >> inventories
-        orderMapper.createOrder(_ as Order) >> 1
-        orderMapper.createOrderDetail(_ as List<OrderDetail>) >> 2
-        inventoryMapper.updateStockQuantity(_ as List<Inventory> ) >> 2
+        productOptionRepository.findAllByIdInAndStatus(_, ProductStatus.ON_SALE) >> productOptions
+        inventoryRepository.findAllByProductOptionIdInForUpdate(_) >> inventories
 
         when:
         orderService.createOrder(UUID, 1L, orderCreateDto)
 
         then:
-        1 * orderMapper.createOrder(_)
-        1 * orderMapper.createOrderDetail(_)
-        1 * inventoryMapper.updateStockQuantity(_)
+        1 * orderRepository.save({ Order o ->
+            o.getOrderDetails().size() == 2 &&
+                    o.getStatus() == OrderStatus.PENDING &&
+                    o.getTotalAmount() == new BigDecimal("900.00") + new BigDecimal("1800.00") * 2
+        })
+        inventories[0].getQuantity() == 0
+        inventories[1].getQuantity() == 0
     }
 
     def "createOrder는 재고 부족 시 예외를 발생시킨다"() {
         given:
-        productMapper.findProductOptionsByIds(_ as List<Long>) >> productOptions
-        inventoryMapper.findStockQuantityForUpdate(_ as List<Inventory>) >> inventories
-        orderMapper.createOrder(_ as Order) >> 1
-        orderMapper.createOrderDetail(_ as List<OrderDetail>) >> 2
-        inventoryMapper.updateStockQuantity(_ as List<Inventory> ) >> 2
+        OrderCreateDto orderCreateDto = new OrderCreateDto([
+                new OrderItemRequestDto(1L, 3),
+                new OrderItemRequestDto(2L, 2)
+        ])
+        productOptionRepository.findAllByIdInAndStatus(_, ProductStatus.ON_SALE) >> productOptions
+        inventoryRepository.findAllByProductOptionIdInForUpdate(_) >> inventories
 
         when:
         orderService.createOrder(UUID, 1L, orderCreateDto)
@@ -204,38 +194,44 @@ class OrderServiceTest extends Specification {
         e.getMessage() == "재고 수량이 충분하지 않습니다."
     }
 
-    private static OrderSearchDto createOrderSearchDto() {
-        def orderSearchDto = OrderSearchDto.builder()
+    def "createOrder는 판매중이 아닌 옵션이 섞여 있으면 주문을 저장하지 않고 거절한다"() {
+        given:
+        OrderCreateDto orderCreateDto = new OrderCreateDto([
+                new OrderItemRequestDto(1L, 1),
+                new OrderItemRequestDto(99L, 1)
+        ])
+        productOptionRepository.findAllByIdInAndStatus(_, ProductStatus.ON_SALE) >> [productOptions[0]]
+
+        when:
+        orderService.createOrder(UUID, 1L, orderCreateDto)
+
+        then:
+        def e = thrown(IllegalArgumentException.class)
+        e.getMessage() == "판매 중이 아닌 상품 옵션이 포함되어 있습니다."
+        0 * orderRepository.save(_)
+        0 * inventoryRepository._
+    }
+
+    def "createOrder는 재고 행이 없는 옵션이면 예외를 발생시킨다"() {
+        given:
+        OrderCreateDto orderCreateDto = new OrderCreateDto([new OrderItemRequestDto(1L, 1)])
+        productOptionRepository.findAllByIdInAndStatus(_, ProductStatus.ON_SALE) >> [productOptions[0]]
+        inventoryRepository.findAllByProductOptionIdInForUpdate(_) >> []
+
+        when:
+        orderService.createOrder(UUID, 1L, orderCreateDto)
+
+        then:
+        def e = thrown(IllegalArgumentException.class)
+        e.getMessage() == "재고 수량이 충분하지 않습니다."
+    }
+
+    private static OrderSearchDto createOrderSearchDto(String startPeriod, String endPeriod) {
+        return OrderSearchDto.builder()
                 .userId(1L)
-                .startPeriod("2025-01-01")
-                .endPeriod("2025-12-31")
+                .startPeriod(startPeriod)
+                .endPeriod(endPeriod)
                 .pageable(Pageable.ofSize(10))
-                .build()
-
-        return orderSearchDto
-    }
-
-    private static OrderResponseDto createOrderResponseDto() {
-        return OrderResponseDto.builder()
-                .id(1L)
-                .userId(1L)
-                .status(OrderStatus.PENDING.getValue())
-                .totalAmount(new BigDecimal(10000))
-                .orderDate(LocalDateTime.now())
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .orderDetails([createOrderDetailResponseDto()] as List<OrderDetailResponseDto>)
-                .build()
-    }
-
-    private static OrderDetailResponseDto createOrderDetailResponseDto() {
-        return OrderDetailResponseDto.builder()
-                .id(1L)
-                .productOptionId(1L)
-                .quantity(5)
-                .price(new BigDecimal(5000))
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
                 .build()
     }
 }

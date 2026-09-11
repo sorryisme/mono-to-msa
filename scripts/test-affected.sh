@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # pre-push 단계 검사 (목표 1~3분): 컴파일 + 테스트.
-# 매퍼 테스트는 실제 MySQL(localhost:3306)을 쓰므로, DB 가 없으면 해당 테스트는
+# 리포지토리 테스트(@DataJpaTest)는 실제 MySQL(localhost:3306)을 쓰므로, DB 가 없으면 해당 테스트는
 # 건너뛰고 "미검증"으로 보고한다. 전체 강제는 CI 몫.
 #
 #   종료:   0 = 통과, 1 = 실패
@@ -56,11 +56,11 @@ if [ $db_up -eq 1 ]; then
     rc=1
   fi
 else
-  warn "MySQL localhost:3306 에 접속할 수 없습니다. 매퍼 테스트를 건너뜁니다."
+  warn "MySQL localhost:3306 에 접속할 수 없습니다. 리포지토리/엔티티 테스트를 건너뜁니다."
   info "전체 검증을 하려면: docker compose up -d db-master db-replica"
   if ./gradlew test --tests '*ServiceTest' 2>&1 | tail -40; then
     ok "서비스 테스트 통과"
-    warn "미검증: 매퍼 테스트(*MapperTest), 스모크 테스트 - DB 없이 실행하지 못했습니다"
+    warn "미검증: 리포지토리/엔티티 테스트(*RepositoryTest, EntityMappingTest), 스모크 테스트 - DB 없이 실행하지 못했습니다"
   else
     err "테스트 실패 - 리포트: build/reports/tests/test/index.html"
     diagnose
