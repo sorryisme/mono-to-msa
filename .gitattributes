@@ -1,4 +1,6 @@
 /gradlew text eol=lf
+# Spotless와 Git이 Windows·Linux에서 동일한 Java 줄바꿈을 사용한다.
+*.java text eol=lf
 # 컨테이너·CI(Linux)에서 실행되는 셸 스크립트는 CRLF 면 `env: 'bash\r'` 로 깨진다.
 *.sh text eol=lf
 /.githooks/* text eol=lf

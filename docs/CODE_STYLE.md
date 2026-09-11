@@ -8,7 +8,8 @@
   - `./gradlew spotlessApply` — 포맷 자동 적용
   - `./gradlew spotlessCheck` — 포맷 위반 여부만 검사 (수정하지 않음)
   - Spotless 플러그인이 기본적으로 `check` 태스크에 `spotlessCheck`를 연결하므로, `./gradlew build`/`./gradlew check` 실행 시 포맷이 깨져 있으면 빌드가 실패합니다. 별도 CI 워크플로우 없이 로컬 빌드에서 강제되는 방식입니다.
-  - 적용 대상은 `src/*/java/**/*.java`(Groovy 테스트 코드는 대상 아님).
+  - 적용 대상은 `src/**/*.java`(Groovy 테스트 코드는 대상 아님).
+  - Java 줄바꿈은 `.gitattributes`의 `*.java text eol=lf`로 LF를 강제합니다. Spotless도 이 Git 속성을 따르므로 Windows와 Linux CI에서 같은 포맷을 사용합니다.
 - **정적 분석(Checkstyle, SonarLint/SonarQube)**: 아직 도입하지 않음. 필요해지면 추가 검토.
 
 ## 로깅 컨벤션
