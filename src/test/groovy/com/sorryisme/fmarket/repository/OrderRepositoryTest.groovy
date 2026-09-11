@@ -70,24 +70,39 @@ class OrderRepositoryTest extends Specification {
         found.getOrderDetails()[0].getProductOptionId() == 1L
     }
 
-    def "비관적 락 조회는 주문 상세까지 함께 가져오고 변경 감지로 상태가 반영된다"() {
+    def "조건부 상태 전이는 현재 상태가 일치할 때만 1행을 갱신한다"() {
         given:
         Order saved = persistOrder(LocalDateTime.now())
         em.flush()
         em.clear()
 
         when:
-        Order locked = orderRepository.findByIdForUpdate(saved.getId()).orElseThrow()
-        // fetch join 으로 이미 로딩됐는지 확인한다. 지연 로딩이면 여기서 false 다.
-        boolean detailsLoaded = em.getEntityManagerFactory().getPersistenceUnitUtil().isLoaded(locked, "orderDetails")
-        locked.changeStatus(OrderStatus.CANCELLED)
-        em.flush()
+        int first = orderRepository.updateStatusIfCurrent(saved.getId(), OrderStatus.PENDING, OrderStatus.CANCELLED)
         em.clear()
 
         then:
-        detailsLoaded
-        locked.getOrderDetails().size() == 1
+        first == 1
         orderRepository.findById(saved.getId()).orElseThrow().getStatus() == OrderStatus.CANCELLED
+    }
+
+    def "이미 상태가 바뀐 주문에 같은 전이를 다시 시도하면 0행이 갱신된다"() {
+        given:
+        Order saved = persistOrder(LocalDateTime.now())
+        em.flush()
+        em.clear()
+        orderRepository.updateStatusIfCurrent(saved.getId(), OrderStatus.PENDING, OrderStatus.CANCELLED)
+        em.clear()
+
+        when:
+        int second = orderRepository.updateStatusIfCurrent(saved.getId(), OrderStatus.PENDING, OrderStatus.CANCELLED)
+
+        then:
+        second == 0
+    }
+
+    def "없는 주문 ID 로 상태 전이를 시도하면 0행이 갱신된다"() {
+        expect:
+        orderRepository.updateStatusIfCurrent(999999L, OrderStatus.PENDING, OrderStatus.CANCELLED) == 0
     }
 
     private Order persistOrder(LocalDateTime orderDate) {

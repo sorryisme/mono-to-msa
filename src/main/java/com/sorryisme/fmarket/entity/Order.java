@@ -26,6 +26,10 @@ import lombok.NoArgsConstructor;
  * order 테이블. MySQL 예약어라 테이블명을 인용한다.
  *
  * <p>주문 상세는 주문이 생명주기를 소유하므로 cascade + orphanRemoval 로 묶는다. 주문자(user)는 생명주기가 독립적이라 FK 값으로만 들고 있다.
+ *
+ * <p>상태 전이는 엔티티의 setter 가 아니라 {@link
+ * com.sorryisme.fmarket.repository.OrderRepository#updateStatusIfCurrent} 의 조건부 UPDATE 로만 한다. 취소·결제
+ * 실패·만료 처리가 동시에 들어와도 전이에 성공하는 요청이 하나뿐이어야 재고 복구 같은 후속 작업이 중복되지 않기 때문이다.
  */
 @Entity
 @Table(name = "\"order\"")
@@ -111,9 +115,5 @@ public class Order extends BaseTimeEntity {
   public void addOrderDetail(OrderDetail orderDetail) {
     orderDetails.add(orderDetail);
     orderDetail.assignOrder(this);
-  }
-
-  public void changeStatus(OrderStatus status) {
-    this.status = status;
   }
 }
