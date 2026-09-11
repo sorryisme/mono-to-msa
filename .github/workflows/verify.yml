@@ -25,9 +25,13 @@ jobs:
       MYSQL_DATABASE: fmarket
       MYSQL_USER: fmarket_ci
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      # wait-for-it.sh는 timeout 내부에서 자신을 직접 실행하므로 먼저 실행 권한이 필요하다.
+      - name: 스크립트 실행 권한 설정
+        run: chmod +x gradlew scripts/*.sh
+
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -57,14 +61,12 @@ jobs:
             sleep 2
           done
 
-      - run: chmod +x gradlew scripts/*.sh
-
       - name: 전체 검증
         run: bash scripts/verify-full.sh
 
       - name: 테스트 리포트 업로드
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-report
           path: build/reports/tests/test
