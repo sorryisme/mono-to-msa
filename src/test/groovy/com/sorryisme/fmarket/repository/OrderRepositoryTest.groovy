@@ -70,7 +70,7 @@ class OrderRepositoryTest extends Specification {
         found.getOrderDetails()[0].getProductOptionId() == 1L
     }
 
-    def "비관적 락 조회는 주문을 돌려주고 변경 감지로 상태가 반영된다"() {
+    def "비관적 락 조회는 주문 상세까지 함께 가져오고 변경 감지로 상태가 반영된다"() {
         given:
         Order saved = persistOrder(LocalDateTime.now())
         em.flush()
@@ -78,11 +78,15 @@ class OrderRepositoryTest extends Specification {
 
         when:
         Order locked = orderRepository.findByIdForUpdate(saved.getId()).orElseThrow()
+        // fetch join 으로 이미 로딩됐는지 확인한다. 지연 로딩이면 여기서 false 다.
+        boolean detailsLoaded = em.getEntityManagerFactory().getPersistenceUnitUtil().isLoaded(locked, "orderDetails")
         locked.changeStatus(OrderStatus.CANCELLED)
         em.flush()
         em.clear()
 
         then:
+        detailsLoaded
+        locked.getOrderDetails().size() == 1
         orderRepository.findById(saved.getId()).orElseThrow().getStatus() == OrderStatus.CANCELLED
     }
 

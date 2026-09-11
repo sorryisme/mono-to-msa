@@ -30,8 +30,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
   @EntityGraph(attributePaths = "orderDetails")
   Optional<Order> findWithDetailsById(Long id);
 
-  /** 주문 행에 비관적 락(SELECT ... FOR UPDATE)을 건다. 상태 전이 전 동시 변경을 막는다. */
+  /**
+   * 주문 행에 비관적 락(SELECT ... FOR UPDATE)을 걸고 주문 상세까지 한 번에 가져온다. 상태 전이 전 동시 변경을 막고, 취소 시 상세를 지연 로딩하느라
+   * SELECT 가 한 번 더 나가지 않게 한다. MySQL 은 조인된 order_detail 행도 함께 잠근다.
+   */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query("select o from Order o where o.id = :id")
+  @Query("select o from Order o left join fetch o.orderDetails where o.id = :id")
   Optional<Order> findByIdForUpdate(@Param("id") Long id);
 }
