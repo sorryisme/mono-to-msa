@@ -47,13 +47,17 @@ jobs:
 
       - name: 테스트용 MySQL 기동
         run: |
+          # 매퍼 SQL 이 "USER" 처럼 식별자를 쌍따옴표로 인용하므로 ANSI_QUOTES 가 없으면
+          # 문자열 리터럴로 해석돼 전부 문법 오류가 난다. docker-compose 와 같은 설정을 쓴다.
           docker run -d --name ci-mysql \
             -e MYSQL_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD" \
             -e MYSQL_DATABASE="$MYSQL_DATABASE" \
             -e MYSQL_USER="$MYSQL_USER" \
             -e MYSQL_PASSWORD="$MYSQL_PASSWORD" \
             -p "${MYSQL_PORT}:3306" \
-            mysql:8.4
+            mysql:8.4 \
+            --sql-mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,ANSI_QUOTES \
+            --lower-case-table-names=1
           bash scripts/wait-for-it.sh "${MYSQL_HOST}:${MYSQL_PORT}" -t 90
           # 포트가 열려도 초기화가 끝나기 전일 수 있다
           for _ in $(seq 30); do
