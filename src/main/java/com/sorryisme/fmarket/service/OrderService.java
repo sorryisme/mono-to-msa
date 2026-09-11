@@ -12,6 +12,7 @@ import com.sorryisme.fmarket.entity.Order;
 import com.sorryisme.fmarket.entity.OrderDetail;
 import com.sorryisme.fmarket.entity.ProductOption;
 import com.sorryisme.fmarket.enums.OrderStatus;
+import com.sorryisme.fmarket.enums.ProductStatus;
 import com.sorryisme.fmarket.exception.NotFoundDataException;
 import com.sorryisme.fmarket.repository.InventoryRepository;
 import com.sorryisme.fmarket.repository.OrderRepository;
@@ -108,15 +109,19 @@ public class OrderService {
   public Long createOrder(
       @IdempotencyKeyParam String idempotencyKey, Long userId, OrderCreateDto orderCreateDto) {
 
-    // 1. 주문 생성 (주문 상세는 cascade 로 함께 저장)
+    // 1. 판매중 옵션만 조회. 하나라도 빠지면(없음·판매중지·삭제) 주문을 거절한다.
     Map<Long, Integer> requestQuantityMap = orderCreateDto.toProductQuantityMap();
     List<ProductOption> productOptions =
-        productOptionRepository.findAllById(requestQuantityMap.keySet());
+        productOptionRepository.findAllByIdInAndStatus(
+            requestQuantityMap.keySet(), ProductStatus.ON_SALE);
+    if (productOptions.size() != requestQuantityMap.size())
+      throw new IllegalArgumentException("판매 중이 아닌 상품 옵션이 포함되어 있습니다.");
 
+    // 2. 주문 생성 (주문 상세는 cascade 로 함께 저장)
     Order order = Order.of(productOptions, requestQuantityMap, userId);
     orderRepository.save(order);
 
-    // 2. 재고 행 잠금 후 수량 검증·차감
+    // 3. 재고 행 잠금 후 수량 검증·차감
     Map<Long, Inventory> inventoryMap =
         inventoryRepository
             .findAllByProductOptionIdInForUpdate(requestQuantityMap.keySet())

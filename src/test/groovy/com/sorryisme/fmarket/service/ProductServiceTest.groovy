@@ -8,6 +8,7 @@ import com.sorryisme.fmarket.dto.response.ProductReviewResponseDto
 import com.sorryisme.fmarket.entity.MajorCategory
 import com.sorryisme.fmarket.entity.ProductReview
 import com.sorryisme.fmarket.entity.Subcategory
+import com.sorryisme.fmarket.enums.ProductStatus
 import com.sorryisme.fmarket.exception.NotFoundDataException
 import com.sorryisme.fmarket.repository.MajorCategoryRepository
 import com.sorryisme.fmarket.repository.ProductOptionRepository
@@ -59,9 +60,9 @@ class ProductServiceTest extends Spec {
         result.getTotalElements() == 1
     }
 
-    def "ID로 상품 조회 시 존재하지 않으면 예외가 발생한다"() {
+    def "ID로 상품 조회 시 존재하지 않거나 삭제됐으면 예외가 발생한다"() {
         given:
-        productRepository.findById(1L) >> Optional.empty()
+        productRepository.findByIdAndStatusNot(1L, ProductStatus.DELETED) >> Optional.empty()
 
         when:
         productService.findProductById(1L)
@@ -73,8 +74,8 @@ class ProductServiceTest extends Spec {
 
     def "ID로 상품 조회 시 상품이 존재하면 옵션·리뷰를 합쳐 반환한다"() {
         given:
-        productRepository.findById(1L) >> Optional.of(DomainFixture.createProduct())
-        productOptionRepository.findAllByProductId(1L) >> [
+        productRepository.findByIdAndStatusNot(1L, ProductStatus.DELETED) >> Optional.of(DomainFixture.createProduct())
+        productOptionRepository.findAllByProductIdAndStatusNot(1L, ProductStatus.DELETED) >> [
                 DomainFixture.createProductOption(101L, 1L, "옵션 1", "4500"),
                 DomainFixture.createProductOption(102L, 1L, "옵션 2", "6500")
         ]
@@ -93,9 +94,9 @@ class ProductServiceTest extends Spec {
         result.getReviews().size() == 2
     }
 
-    def "리뷰 생성 시 상품이 존재하지 않으면 예외가 발생한다"() {
+    def "리뷰 생성 시 상품이 존재하지 않거나 삭제됐으면 예외가 발생한다"() {
         given:
-        productRepository.existsById(1L) >> false
+        productRepository.existsByIdAndStatusNot(1L, ProductStatus.DELETED) >> false
 
         when:
         productService.createReview(createProductReviewRequestDto(), 1L, 1L)
@@ -108,7 +109,7 @@ class ProductServiceTest extends Spec {
 
     def "리뷰 생성 시 성공적으로 저장된다"() {
         given:
-        productRepository.existsById(1L) >> true
+        productRepository.existsByIdAndStatusNot(1L, ProductStatus.DELETED) >> true
         productReviewRepository.save(_ as ProductReview) >> { ProductReview r -> r }
 
         when:

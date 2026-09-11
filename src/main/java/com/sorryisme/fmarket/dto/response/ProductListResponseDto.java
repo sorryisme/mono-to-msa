@@ -27,7 +27,7 @@ public class ProductListResponseDto {
   private String catalog;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
-  private LocalDateTime deletedAt;
+  private String status;
 
   public static ProductListResponseDto from(Product product) {
     return ProductListResponseDto.builder()
@@ -40,7 +40,7 @@ public class ProductListResponseDto {
         .catalog(product.getCatalog())
         .createdAt(product.getCreatedAt())
         .updatedAt(product.getUpdatedAt())
-        .deletedAt(product.getDeletedAt())
+        .status(product.getStatus().name())
         .build();
   }
 }

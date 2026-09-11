@@ -9,6 +9,7 @@ import com.sorryisme.fmarket.dto.response.ProductResponseDto;
 import com.sorryisme.fmarket.dto.response.ProductReviewResponseDto;
 import com.sorryisme.fmarket.entity.Product;
 import com.sorryisme.fmarket.entity.ProductReview;
+import com.sorryisme.fmarket.enums.ProductStatus;
 import com.sorryisme.fmarket.exception.NotFoundDataException;
 import com.sorryisme.fmarket.repository.MajorCategoryRepository;
 import com.sorryisme.fmarket.repository.ProductOptionRepository;
@@ -46,16 +47,17 @@ public class ProductService {
         .map(ProductListResponseDto::from);
   }
 
+  /** 삭제된 상품은 404 로 취급한다. 판매중지 상품은 상세를 보여주되 옵션도 삭제된 것만 뺀다. */
   @Transactional(readOnly = true)
   public ProductResponseDto findProductById(Long id) {
     Product product =
         productRepository
-            .findById(id)
+            .findByIdAndStatusNot(id, ProductStatus.DELETED)
             .orElseThrow(() -> new NotFoundDataException("찾을 수 없는 제품입니다."));
 
     return ProductResponseDto.of(
         product,
-        productOptionRepository.findAllByProductId(id),
+        productOptionRepository.findAllByProductIdAndStatusNot(id, ProductStatus.DELETED),
         productReviewRepository.findAllByProductId(id));
   }
 
@@ -63,7 +65,8 @@ public class ProductService {
   public ProductReviewResponseDto createReview(
       ProductReviewRequestDto reviewRequestDto, Long productId, Long userId) {
 
-    if (!productRepository.existsById(productId)) throw new NotFoundDataException("찾을 수 없는 제품입니다.");
+    if (!productRepository.existsByIdAndStatusNot(productId, ProductStatus.DELETED))
+      throw new NotFoundDataException("찾을 수 없는 제품입니다.");
 
     ProductReview productReview =
         ProductReview.builder()

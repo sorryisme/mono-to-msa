@@ -53,9 +53,9 @@ CREATE TABLE `product` (
   `major_category` int DEFAULT NULL COMMENT '대분류 코드',
   `subcategory` int DEFAULT NULL COMMENT '중분류 코드',
   `catalog` text COMMENT '상품 카탈로그',
+  `status` enum('ON_SALE','SUSPENDED','DELETED') NOT NULL DEFAULT 'ON_SALE' COMMENT '판매 상태(DELETED 는 소프트 삭제)',
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '생성 일시',
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정 일시',
-  `deleted_at` datetime DEFAULT NULL COMMENT '삭제 일시',
   PRIMARY KEY (`id`)
 );
 
@@ -66,9 +66,9 @@ CREATE TABLE `product_option` (
   `option_name` varchar(100) NOT NULL COMMENT '옵션 이름',
   `origin_price` decimal(10,2) NOT NULL COMMENT '원가',
   `sale_price` decimal(10,2) NOT NULL COMMENT '판매가',
+  `status` enum('ON_SALE','SUSPENDED','DELETED') NOT NULL DEFAULT 'ON_SALE' COMMENT '판매 상태(DELETED 는 소프트 삭제)',
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '생성 일시',
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정 일시',
-  `deleted_at` datetime DEFAULT NULL COMMENT '삭제 일시',
   PRIMARY KEY (`id`),
   CONSTRAINT `product_option_ibfk_1` FOREIGN KEY (`product_id`) REFERENCES `product` (`id`) ON DELETE CASCADE
 );
@@ -160,7 +160,6 @@ CREATE TABLE `inventory` (
   `quantity` int NOT NULL DEFAULT '0' COMMENT '현재 수량',
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '생성 일시',
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정 일시',
-  `deleted_at` datetime DEFAULT NULL COMMENT '삭제 일시',
   PRIMARY KEY (`id`),
   KEY `product_option_id` (`product_option_id`)
 );

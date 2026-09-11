@@ -6,7 +6,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -16,6 +15,7 @@ import lombok.NoArgsConstructor;
  * inventory 테이블.
  *
  * <p>기존 MyBatis 도메인에는 PK 필드가 없고 product_option_id 로만 다뤘지만, 테이블에는 id PK 가 있으므로 엔티티에서는 이를 식별자로 매핑한다.
+ * 재고는 옵션의 생명주기를 따르므로 독립된 삭제 상태를 두지 않는다.
  */
 @Entity
 @Table(name = "inventory")
@@ -32,9 +32,6 @@ public class Inventory extends BaseTimeEntity {
 
   @Column(name = "quantity", nullable = false)
   private Integer quantity;
-
-  @Column(name = "deleted_at")
-  private LocalDateTime deletedAt;
 
   @Builder
   private Inventory(Long id, Long productOptionId, Integer quantity) {

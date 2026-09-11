@@ -9,6 +9,7 @@ import com.sorryisme.fmarket.entity.Inventory
 import com.sorryisme.fmarket.entity.Order
 import com.sorryisme.fmarket.entity.ProductOption
 import com.sorryisme.fmarket.enums.OrderStatus
+import com.sorryisme.fmarket.enums.ProductStatus
 import com.sorryisme.fmarket.exception.NotFoundDataException
 import com.sorryisme.fmarket.repository.InventoryRepository
 import com.sorryisme.fmarket.repository.OrderRepository
@@ -160,7 +161,7 @@ class OrderServiceTest extends Specification {
                 new OrderItemRequestDto(1L, 1),
                 new OrderItemRequestDto(2L, 2)
         ])
-        productOptionRepository.findAllById(_) >> productOptions
+        productOptionRepository.findAllByIdInAndStatus(_, ProductStatus.ON_SALE) >> productOptions
         inventoryRepository.findAllByProductOptionIdInForUpdate(_) >> inventories
 
         when:
@@ -182,7 +183,7 @@ class OrderServiceTest extends Specification {
                 new OrderItemRequestDto(1L, 3),
                 new OrderItemRequestDto(2L, 2)
         ])
-        productOptionRepository.findAllById(_) >> productOptions
+        productOptionRepository.findAllByIdInAndStatus(_, ProductStatus.ON_SALE) >> productOptions
         inventoryRepository.findAllByProductOptionIdInForUpdate(_) >> inventories
 
         when:
@@ -193,10 +194,28 @@ class OrderServiceTest extends Specification {
         e.getMessage() == "재고 수량이 충분하지 않습니다."
     }
 
+    def "createOrder는 판매중이 아닌 옵션이 섞여 있으면 주문을 저장하지 않고 거절한다"() {
+        given:
+        OrderCreateDto orderCreateDto = new OrderCreateDto([
+                new OrderItemRequestDto(1L, 1),
+                new OrderItemRequestDto(99L, 1)
+        ])
+        productOptionRepository.findAllByIdInAndStatus(_, ProductStatus.ON_SALE) >> [productOptions[0]]
+
+        when:
+        orderService.createOrder(UUID, 1L, orderCreateDto)
+
+        then:
+        def e = thrown(IllegalArgumentException.class)
+        e.getMessage() == "판매 중이 아닌 상품 옵션이 포함되어 있습니다."
+        0 * orderRepository.save(_)
+        0 * inventoryRepository._
+    }
+
     def "createOrder는 재고 행이 없는 옵션이면 예외를 발생시킨다"() {
         given:
-        OrderCreateDto orderCreateDto = new OrderCreateDto([new OrderItemRequestDto(99L, 1)])
-        productOptionRepository.findAllById(_) >> []
+        OrderCreateDto orderCreateDto = new OrderCreateDto([new OrderItemRequestDto(1L, 1)])
+        productOptionRepository.findAllByIdInAndStatus(_, ProductStatus.ON_SALE) >> [productOptions[0]]
         inventoryRepository.findAllByProductOptionIdInForUpdate(_) >> []
 
         when:

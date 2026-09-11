@@ -2,12 +2,13 @@ package com.sorryisme.fmarket.repository;
 
 import com.sorryisme.fmarket.dto.request.ProductSearchDto;
 import com.sorryisme.fmarket.entity.Product;
+import com.sorryisme.fmarket.enums.ProductStatus;
 import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.data.jpa.domain.Specification;
 
-/** 상품 목록 검색 조건. 값이 없는 조건은 건너뛴다(기존 동적 SQL 과 동일). */
+/** 상품 목록 검색 조건. 값이 없는 조건은 건너뛴다(기존 동적 SQL 과 동일). 고객 목록이므로 판매중(ON_SALE) 상품만 대상이다. */
 public final class ProductSpecification {
 
   private ProductSpecification() {}
@@ -15,6 +16,7 @@ public final class ProductSpecification {
   public static Specification<Product> search(ProductSearchDto searchDto) {
     return (root, query, cb) -> {
       List<Predicate> predicates = new ArrayList<>();
+      predicates.add(cb.equal(root.get("status"), ProductStatus.ON_SALE));
 
       if (searchDto.getQuery() != null && !searchDto.getQuery().isEmpty()) {
         predicates.add(cb.like(root.get("productName"), "%" + searchDto.getQuery() + "%"));

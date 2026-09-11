@@ -1,6 +1,7 @@
 package com.sorryisme.fmarket.entity
 
 import com.sorryisme.fmarket.enums.OrderStatus
+import com.sorryisme.fmarket.enums.ProductStatus
 import com.sorryisme.fmarket.enums.UserRole
 import jakarta.persistence.EntityManager
 import org.springframework.beans.factory.annotation.Autowired
@@ -131,5 +132,35 @@ class EntityMappingTest extends Specification {
         em.clear()
         then:
         em.find(Cart, cart.getId()).getCartDetails().isEmpty()
+    }
+
+    def "상품과 옵션은 status 가 기본 ON_SALE 로 저장되고 소프트 삭제가 문자열로 반영된다"() {
+        given:
+        Product product = Product.builder().productName("모자").description("설명").build()
+        em.persist(product)
+        ProductOption option = ProductOption.builder()
+                .productId(product.getId())
+                .optionName("FREE")
+                .originPrice(new BigDecimal("3000.00"))
+                .salePrice(new BigDecimal("2500.00"))
+                .build()
+        em.persist(option)
+        em.flush()
+        em.clear()
+
+        expect:
+        em.find(Product, product.getId()).getStatus() == ProductStatus.ON_SALE
+        em.find(ProductOption, option.getId()).getStatus() == ProductStatus.ON_SALE
+
+        when:
+        em.find(Product, product.getId()).delete()
+        em.find(ProductOption, option.getId()).suspend()
+        em.flush()
+        em.clear()
+
+        then:
+        em.find(Product, product.getId()).getStatus() == ProductStatus.DELETED
+        em.find(ProductOption, option.getId()).getStatus() == ProductStatus.SUSPENDED
+        em.createNativeQuery("select status from product where id = :id").setParameter("id", product.getId()).getSingleResult() == "DELETED"
     }
 }
