@@ -1,0 +1,93 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.1'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'groovy'
+    id 'com.diffplug.spotless' version '8.10.2'
+}
+
+group = 'com.sorryisme'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.security:spring-security-crypto'
+    implementation 'org.springframework.boot:spring-boot-starter-aspectj'
+    implementation 'org.springframework.data:spring-data-commons' //페이지네이션 용도
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    runtimeOnly 'com.h2database:h2'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter-test:4.1.0'
+    testImplementation 'org.spockframework:spock-core:2.4-groovy-5.0'
+    testImplementation 'org.spockframework:spock-spring:2.4-groovy-5.0'
+}
+
+// 자격증명은 .env 에만 둔다(.gitignore 대상). application.yml 은 기본값을 갖지 않으므로
+// 값이 없으면 빈 비밀번호로 조용히 붙는 대신 기동 단계에서 바로 실패한다.
+// 테스트/실행 JVM 은 .env 를 자동으로 읽지 않아 여기서 주입한다.
+// CI 는 워크플로에서 환경변수를 직접 주입하므로 .env 없이 동작한다.
+def dotenv = [:]
+def dotenvFile = file('.env')
+if (dotenvFile.exists()) {
+    dotenvFile.eachLine('UTF-8') { line ->
+        def trimmed = line.trim()
+        if (trimmed && !trimmed.startsWith('#') && trimmed.contains('=')) {
+            def idx = trimmed.indexOf('=')
+            dotenv[trimmed.substring(0, idx).trim()] = trimmed.substring(idx + 1).trim()
+        }
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    dotenv.each { key, value -> environment(key, value) }
+}
+
+tasks.named('bootRun') {
+    dotenv.each { key, value -> environment(key, value) }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(GroovyCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+spotless {
+    java {
+        target 'src/**/*.java'
+        googleJavaFormat()
+        importOrder()
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}

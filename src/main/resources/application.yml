@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: fmarket
+  datasource:
+    source:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      jdbc-url: jdbc:mysql://${MYSQL_MASTER_HOST:db-master}:${MYSQL_MASTER_PORT:3306}/${MYSQL_DATABASE:fmarket}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true
+      username: ${MYSQL_USER:sorry}
+      password: ${MYSQL_PASSWORD}
+    replica:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      jdbc-url: jdbc:mysql://${MYSQL_REPLICA_HOST:db-replica}:${MYSQL_REPLICA_PORT:3306}/${MYSQL_DATABASE:fmarket}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true
+      username: ${MYSQL_USER:sorry}
+      password: ${MYSQL_PASSWORD}
+  sql:
+    init:
+      mode: always
+
+mybatis:
+  mapper-locations: classpath:/mapper/**/*.xml
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true

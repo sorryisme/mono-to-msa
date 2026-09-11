@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# 빠르고 결정적인 검사만. 느린 것은 pre-push / CI 로.
+# 활성화: git config core.hooksPath .githooks
+exec bash "$(git rev-parse --show-toplevel)/scripts/lint-changed.sh" --staged

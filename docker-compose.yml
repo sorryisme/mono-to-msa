@@ -1,0 +1,86 @@
+services:
+  db-master:
+    image: mysql:8.4
+    container_name: mysql-master
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: ${TZ}
+      MYSQL_REPLICATION_USER: ${MYSQL_REPLICATION_USER}
+      MYSQL_REPLICATION_PASSWORD: ${MYSQL_REPLICATION_PASSWORD}
+    # Windows 바인드 마운트는 컨테이너 안에서 0777 로 보이고, MySQL 은 world-writable
+    # 설정 파일을 무시한다("World-writable config file ... is ignored"). 그러면 master.cnf 의
+    # ANSI_QUOTES / lower_case_table_names 가 적용되지 않아 매퍼 SQL 이 전부 깨진다.
+    # CLI 인자는 권한 검사를 받지 않고 파일보다 우선하므로 여기서 함께 지정한다.
+    command:
+      - --sql-mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,ANSI_QUOTES
+      - --lower-case-table-names=1
+      - --slow-query-log=1
+      - --server-id=1
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --log-bin=mysql-master-bin
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_master_data:/var/lib/mysql
+      - ./docker-init/master:/docker-entrypoint-initdb.d
+      - ./docker-init/mysql-config/master.cnf:/etc/mysql/conf.d/master.cnf
+    networks:
+      - mysql-network
+  db-replica:
+    image: mysql:8.4
+    container_name: mysql-replica
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: ${TZ}
+      MYSQL_REPLICATION_USER: ${MYSQL_REPLICATION_USER}
+      MYSQL_REPLICATION_PASSWORD: ${MYSQL_REPLICATION_PASSWORD}
+    # db-master 와 같은 이유로 replica.cnf 내용을 CLI 인자로도 지정한다.
+    command:
+      - --sql-mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,ANSI_QUOTES
+      - --lower-case-table-names=1
+      - --slow-query-log=1
+      - --server-id=2
+      - --relay-log=replica-relay-log
+      - --relay-log-purge=ON
+      - --read-only
+      - --log-replica-updates
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_replica_data:/var/lib/mysql
+      - ./docker-init/replica:/docker-entrypoint-initdb.d
+      - ./docker-init/mysql-config/replica.cnf:/etc/mysql/conf.d/replica.cnf
+    depends_on:
+      - db-master
+    networks:
+      - mysql-network
+  java-app:
+    container_name: java-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    # DB 자격증명은 .env 에서 주입한다 (application.yml 은 기본값만 가진다)
+    env_file:
+      - .env
+    depends_on:
+      - db-master
+      - db-replica
+    networks:
+      - mysql-network
+    command: ["./scripts/wait-for-it.sh", "db-replica:3307", "--", "java", "-jar", "app.jar"]
+volumes:
+  db_master_data:
+  db_replica_data:
+networks:
+  mysql-network:

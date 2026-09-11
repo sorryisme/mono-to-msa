@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# 컴파일 + 테스트. 로컬에서 잡을 수 있는 회귀는 여기서 잡는다.
+# 활성화: git config core.hooksPath .githooks
+exec bash "$(git rev-parse --show-toplevel)/scripts/test-affected.sh"
