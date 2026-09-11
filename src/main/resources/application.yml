@@ -12,6 +12,15 @@ spring:
       jdbc-url: jdbc:mysql://${MYSQL_REPLICA_HOST:db-replica}:${MYSQL_REPLICA_PORT:3306}/${MYSQL_DATABASE:fmarket}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true
       username: ${MYSQL_USER:sorry}
       password: ${MYSQL_PASSWORD}
+  jpa:
+    # 스키마는 schema.sql 이 관리한다. Hibernate 가 운영 스키마를 건드리지 않게 none 으로 고정한다.
+    hibernate:
+      ddl-auto: none
+    # 트랜잭션 밖(뷰 렌더링 시점)의 지연 로딩을 막는다.
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
   sql:
     init:
       mode: always
