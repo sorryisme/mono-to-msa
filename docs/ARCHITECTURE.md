@@ -4,9 +4,14 @@ f-market 백엔드의 아키텍처 상세 문서입니다. 프로젝트 개요�
 
 ## 레이어드 아키텍처
 
-`controller -> service -> mapper (MyBatis XML)`. SQL은 전부 `src/main/resources/mapper/*.xml`에 있고,
-`src/main/java/.../mapper/`의 매퍼 인터페이스는 얇은 껍데기입니다 (예외적으로 `IdempotencyKeyMapper`는 별도 XML 없이 인라인 `@Select` 사용).
-`domain/`의 도메인 객체는 여러 레이어에서 공유되는 단순 데이터 홀더이며, JPA 엔티티/도메인 분리 구조는 없습니다.
+`controller -> service -> repository (Spring Data JPA)`. 데이터 접근은 `src/main/java/.../repository/`의 `JpaRepository` 인터페이스가 담당하고,
+동적 검색 조건은 `ProductSpecification`(Criteria API)으로, 잠금·fetch join 이 필요한 조회는 `@Query`/`@Lock`/`@EntityGraph` 로 표현합니다.
+`entity/`의 JPA 엔티티는 영속성 계층 안에서만 다루고, 컨트롤러 응답은 항상 `dto/response` 로 변환합니다 (엔티티 직접 노출 금지).
+엔티티는 setter 없이 `changeStatus`, `decrease` 같은 의미 있는 변경 메서드만 노출하며, 쓰기 트랜잭션 안에서 변경 감지로 UPDATE 가 나갑니다.
+`created_at`/`updated_at` 은 DB 기본값이 채우므로 `BaseTimeEntity` 가 읽기 전용으로 매핑합니다. 스키마는 `schema.sql` 이 관리하고 `spring.jpa.hibernate.ddl-auto=none` 으로 고정합니다.
+
+연관관계는 생명주기를 소유하는 부모-자식(`Order↔OrderDetail`, `Cart↔CartDetail`, `MajorCategory↔Subcategory`)에만 걸고(`cascade=ALL, orphanRemoval=true`, LAZY),
+`User`·`ProductOption`·`Product` 참조는 `Long` FK 값으로 유지합니다. 그래서 `Product` 상세 조회는 상품·옵션·리뷰를 세 번 조회해 DTO 로 합칩니다.
 
 `src/main/java/com/sorryisme/fmarket/` 하위 패키지 구성:
 - `annotation/` — `@RequireLogin`, `@LoginUserId`, `@Idempotent`, `@IdempotencyKeyParam`. 컨트롤러 메서드/파라미터에 적용.
@@ -19,14 +24,16 @@ f-market 백엔드의 아키텍처 상세 문서입니다. 프로젝트 개요�
 
 `ReplicationRoutingDataSource`(`AbstractRoutingDataSource` 상속)는 `TransactionSynchronizationManager.isCurrentTransactionReadOnly()` 값을 기준으로
 트랜잭션마다 마스터/레플리카를 선택합니다 — 즉 라우팅은 호출 위치가 아니라 서비스 메서드의 `@Transactional(readOnly = true)` 설정으로 제어됩니다.
+JPA 도입 후에도 `@Primary` DataSource 는 그대로 `LazyConnectionDataSourceProxy` 이므로 EntityManager 가 실제 커넥션을 얻는 시점(첫 쿼리)에 라우팅이 결정됩니다.
+`readOnly = true` 는 replica 라우팅과 동시에 Hibernate flush 를 끄므로, 쓰기 메서드에는 절대 붙이지 않습니다.
 Docker Compose에서 마스터는 `db-master:3306`, 레플리카는 `db-replica:3307`이며, 앱 컨테이너는 `scripts/wait-for-it.sh db-replica:3307`로 레플리카가 준비될 때까지 대기한 뒤 시작합니다.
 
 ## 멱등성과 락 (주문 생성)
 
-- `@Idempotent`(`IdempotencyAspect`가 검사)는 `@IdempotencyKeyParam`이 붙은 UUID 파라미터를 필요로 하며, `idempotency_keys` 테이블에 INSERT하고 중복 키인 경우 `DuplicateDataException`을 던집니다.
-- `InventoryMapper.findStockQuantityForUpdate`는 대상 `product_option_id` 행에 비관적 락(`SELECT ... FOR UPDATE`)을 겁니다.
-- 주문 취소/조회는 `OrderMapper.xml`의 `WHERE o.id = #{orderId} FOR UPDATE`로 행 락을 겁니다.
-- `OrderService`의 주문 생성 로직은 `@Idempotent` + `@Transactional`을 함께 사용해, 멱등성 키 검증·재고 락·주문/재고 갱신이 하나의 트랜잭션 안에서 처리됩니다.
+- `@Idempotent`(`IdempotencyAspect`가 검사)는 `@IdempotencyKeyParam`이 붙은 UUID 파라미터를 필요로 하며, `IdempotencyKeyRepository.saveAndFlush` 로 `idempotency_keys` 에 INSERT 합니다. 유니크 제약 위반(`DataIntegrityViolationException`)이 곧 중복 요청이며 `DuplicateDataException`으로 바꿔 던집니다.
+- `InventoryRepository.findAllByProductOptionIdInForUpdate`는 `@Lock(PESSIMISTIC_WRITE)`로 대상 `product_option_id` 행에 비관적 락(`SELECT ... FOR UPDATE`)을 겁니다. 수량 변경은 `Inventory.decrease/increase` 후 변경 감지로 반영됩니다.
+- 주문 취소는 `OrderRepository.findByIdForUpdate`(`@Lock(PESSIMISTIC_WRITE)`)로 주문 행에 락을 건 뒤 상태를 검사합니다.
+- `OrderService`의 주문 생성 로직은 `@Idempotent` + `@Transactional`을 함께 사용해, 멱등성 키 검증·재고 락·주문/재고 갱신이 하나의 트랜잭션 안에서 처리됩니다. 주문 상세는 `Order` 의 cascade 로 함께 저장됩니다.
 
 ## 인증
 
