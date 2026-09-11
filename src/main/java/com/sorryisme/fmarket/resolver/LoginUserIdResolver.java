@@ -1,8 +1,9 @@
 package com.sorryisme.fmarket.resolver;
 
 import com.sorryisme.fmarket.annotation.LoginUserId;
+import com.sorryisme.fmarket.common.ErrorCode;
 import com.sorryisme.fmarket.common.SessionManager;
-import com.sorryisme.fmarket.exception.RequireLoginException;
+import com.sorryisme.fmarket.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.MethodParameter;
 import org.springframework.stereotype.Component;
@@ -31,7 +32,7 @@ public class LoginUserIdResolver implements HandlerMethodArgumentResolver {
       throws Exception {
     Long userId = sessionManager.getUserId();
 
-    if (userId == null) throw new RequireLoginException("로그인 되어있지 않은 유저입니다.");
+    if (userId == null) throw new BusinessException(ErrorCode.LOGIN_REQUIRED);
 
     return userId;
   }

@@ -13,7 +13,9 @@ import com.sorryisme.fmarket.dto.response.UserResponseDto;
 import com.sorryisme.fmarket.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 @RestController
 @RequiredArgsConstructor
@@ -24,6 +26,7 @@ public class UserController {
   private final SessionManager sessionManager;
 
   @PostMapping("/user/signup")
+  @ResponseStatus(HttpStatus.CREATED)
   public ResponseDto<UserResponseDto> createUser(
       @RequestBody @Valid UserRequestDto userRequestDto) {
     UserResponseDto responseDto = userService.createUser(userRequestDto);
@@ -39,6 +42,7 @@ public class UserController {
   }
 
   @PostMapping("/seller/signup")
+  @ResponseStatus(HttpStatus.CREATED)
   public ResponseDto<SellerResponseDto> createSeller(
       @RequestBody @Valid SellerRequestDto sellerRequestDto) {
     SellerResponseDto responseDto = userService.createSeller(sellerRequestDto);

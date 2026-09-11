@@ -23,7 +23,7 @@ f-market 백엔드의 아키텍처 상세 문서입니다. 프로젝트 개요�
 - `aop/` — `AuthenticationAspect`와 `IdempotencyAspect`가 위 두 애노테이션을 AspectJ `@Before` 어드바이스로 구현.
 - `resolver/LoginUserIdResolver` + `config/WebConfig` — `@LoginUserId` 컨트롤러 파라미터를 `SessionManager`로부터 해석해주는 커스텀 `HandlerMethodArgumentResolver`.
 - `config/` — `DataSourceConfiguration`이 `application.yml`의 `source`/`replica` 두 데이터소스를 `ReplicationRoutingDataSource`에 연결.
-- `common/GlobalExceptionHandler` — `exception/` 패키지의 커스텀 예외들을 HTTP 응답으로 매핑하는 `@RestControllerAdvice`.
+- `exception/GlobalExceptionHandler` — `BusinessException` 과 프레임워크 예외를 [API_RESPONSE.md](API_RESPONSE.md) 의 봉투 형식으로 매핑하는 `@RestControllerAdvice`. HTTP 상태는 `common/ErrorCode` 가 결정한다.
 
 ## 읽기/쓰기 DB 라우팅
 

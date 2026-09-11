@@ -5,8 +5,8 @@ import com.sorryisme.fmarket.dto.request.UserRequestDto
 import com.sorryisme.fmarket.dto.request.UserUpdateRequestDto
 import com.sorryisme.fmarket.entity.Store
 import com.sorryisme.fmarket.entity.User
-import com.sorryisme.fmarket.exception.DuplicateDataException
-import com.sorryisme.fmarket.exception.NotFoundDataException
+import com.sorryisme.fmarket.exception.BusinessException
+import com.sorryisme.fmarket.common.ErrorCode
 import com.sorryisme.fmarket.repository.StoreRepository
 import com.sorryisme.fmarket.repository.UserRepository
 import com.sorryisme.fmarket.testUtils.DomainFixture
@@ -27,8 +27,8 @@ class UserServiceTest extends Specification {
         userService.createUser(createUserRequestDto())
 
         then:
-        def e = thrown(DuplicateDataException.class)
-        e.getMessage() == "이미 등록된 유저입니다."
+        def e = thrown(BusinessException)
+        e.errorCode == ErrorCode.DUPLICATE_USER
         0 * userRepository.save(_)
     }
 
@@ -78,8 +78,8 @@ class UserServiceTest extends Specification {
         userService.updateUser(createUpdateRequestDto(), 1L)
 
         then:
-        def e = thrown(NotFoundDataException)
-        e.getMessage() == "찾을 수 없는 유저입니다"
+        def e = thrown(BusinessException)
+        e.errorCode == ErrorCode.USER_NOT_FOUND
     }
 
     def "유저 업데이트 시 엔티티가 수정되고 수정된 유저 ID를 반환한다"() {
@@ -105,8 +105,8 @@ class UserServiceTest extends Specification {
         userService.login("null", "1234")
 
         then:
-        def e = thrown(IllegalArgumentException)
-        e.getMessage() == "찾을 수 없는 유저입니다."
+        def e = thrown(BusinessException)
+        e.errorCode == ErrorCode.LOGIN_FAILED
     }
 
     def "로그인 시 비밀번호 틀린 경우 에러를 발생시킨다"() {
@@ -117,8 +117,8 @@ class UserServiceTest extends Specification {
         userService.login("testUser", "1234567")
 
         then:
-        def e = thrown(IllegalArgumentException)
-        e.getMessage() == "로그인정보가 일치하지 않습니다."
+        def e = thrown(BusinessException)
+        e.errorCode == ErrorCode.LOGIN_FAILED
     }
 
     def "로그인 성공 시 id를 반환한다"() {

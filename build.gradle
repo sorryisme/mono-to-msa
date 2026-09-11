@@ -45,6 +45,8 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     // Boot 4 부터 @DataJpaTest 슬라이스는 별도 모듈로 분리되어 있다.
     testImplementation 'org.springframework.boot:spring-boot-data-jpa-test'
+    // @WebMvcTest 슬라이스도 Boot 4 부터 별도 모듈이다.
+    testImplementation 'org.springframework.boot:spring-boot-webmvc-test'
     testImplementation 'org.spockframework:spock-core:2.4-groovy-5.0'
     testImplementation 'org.spockframework:spock-spring:2.4-groovy-5.0'
 }

@@ -15,7 +15,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 @RestController
 @RequiredArgsConstructor
@@ -25,8 +27,8 @@ public class ProductController {
   private final ProductService productService;
 
   @GetMapping("/products/category")
-  public List<MajorCategoryResponse> findMajorCategoryList() {
-    return productService.findMajorCategoryList();
+  public ResponseDto<List<MajorCategoryResponse>> findMajorCategoryList() {
+    return ResponseDto.success(productService.findMajorCategoryList());
   }
 
   @PostMapping("/products/search")
@@ -45,6 +47,7 @@ public class ProductController {
   }
 
   @PostMapping("/{productId}/reviews")
+  @ResponseStatus(HttpStatus.CREATED)
   @RequireLogin
   public ResponseDto<ProductReviewResponseDto> createReview(
       @RequestBody ProductReviewRequestDto requestDto,

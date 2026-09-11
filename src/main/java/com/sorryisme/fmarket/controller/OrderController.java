@@ -13,7 +13,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 @RestController
 @RequiredArgsConstructor
@@ -53,6 +55,7 @@ public class OrderController {
   }
 
   @PostMapping("/orders/create")
+  @ResponseStatus(HttpStatus.CREATED)
   @RequireLogin
   public ResponseDto<Long> createOrder(
       @RequestHeader(value = IDEMPOTENCY_KEY_HEADER) String idempotencyKey,

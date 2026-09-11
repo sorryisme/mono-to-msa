@@ -1,7 +1,8 @@
 package com.sorryisme.fmarket.aop;
 
+import com.sorryisme.fmarket.common.ErrorCode;
 import com.sorryisme.fmarket.common.SessionManager;
-import com.sorryisme.fmarket.exception.RequireLoginException;
+import com.sorryisme.fmarket.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
@@ -20,7 +21,7 @@ public class AuthenticationAspect {
     Long loginId = sessionManager.getUserId();
 
     if (loginId == null) {
-      throw new RequireLoginException("로그인에 실패했습니다. 로그인해주세요");
+      throw new BusinessException(ErrorCode.LOGIN_REQUIRED);
     }
 
     return true;
