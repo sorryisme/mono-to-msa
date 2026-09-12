@@ -83,7 +83,7 @@ INSERT INTO `inventory` (`product_option_id`, `quantity`) values(2 ,100);
 
 INSERT INTO `user` (`login_id`, `password`, `salt`, `name`, `email`, `phone_number`, `role`, `created_at`, `updated_at`)
 VALUES
-    ('dummyUser', 'xptmxmqlalfqjsgh!', 'dummySalt', '더미유저', 'dummy@naver.com', '01099999999', 'USER', NOW(), NOW());
+    ('dummyUser', 'xptmxmqlalfqjsgh!', 'dummySalt', '더미유저', 'dummy@example.com', '01099999999', 'USER', NOW(), NOW());
 -- 주문 데이터 삽입
 INSERT INTO `order` (`user_id`, `order_date`, `status`, `total_amount`, `created_at`, `updated_at`)
 VALUES

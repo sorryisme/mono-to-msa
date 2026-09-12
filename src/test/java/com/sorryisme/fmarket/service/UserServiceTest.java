@@ -83,7 +83,7 @@ class UserServiceTest {
 
     verify(storeRepository).save(argThat(store -> store.getUserId() == 10L));
     assertThat(result.getLoginId()).isEqualTo("testUser");
-    assertThat(result.getEmail()).isEqualTo("test@naver.com");
+    assertThat(result.getEmail()).isEqualTo("test@example.com");
     assertThat(result.getName()).isEqualTo("테스트유저");
     assertThat(result.getPhoneNumber()).isEqualTo("01012345678");
     assertThat(result.getStoreName()).isEqualTo(requestDto.getStoreName());
@@ -111,7 +111,7 @@ class UserServiceTest {
 
     assertThat(result).isEqualTo(1L);
     assertThat(user.getName()).isEqualTo("변경된 이름");
-    assertThat(user.getEmail()).isEqualTo("updated_email@naver.com");
+    assertThat(user.getEmail()).isEqualTo("updated_email@example.com");
     assertThat(user.getPhoneNumber()).isEqualTo("01098765432");
   }
 
@@ -150,7 +150,7 @@ class UserServiceTest {
         .loginId("testUser")
         .password("xptmxmqlalfqjsgh!")
         .name("테스트유저")
-        .email("test@naver.com")
+        .email("test@example.com")
         .phoneNumber("01012345678")
         .build();
   }
@@ -160,11 +160,11 @@ class UserServiceTest {
         .loginId("testUser")
         .password("xptmxmqlalfqjsgh!")
         .name("테스트유저")
-        .email("test@naver.com")
+        .email("test@example.com")
         .phoneNumber("01012345678")
         .storeName("테스트 상점")
         .businessNumber("012-12-34567")
-        .logoUrl("https://naver.com/test.jpg")
+        .logoUrl("https://example.com/test.jpg")
         .description("설명테스트")
         .build();
   }
@@ -172,7 +172,7 @@ class UserServiceTest {
   private static UserUpdateRequestDto createUpdateRequestDto() {
     return UserUpdateRequestDto.builder()
         .name("변경된 이름")
-        .email("updated_email@naver.com")
+        .email("updated_email@example.com")
         .phoneNumber("01098765432")
         .build();
   }
@@ -185,7 +185,7 @@ class UserServiceTest {
         .password(PasswordCipher.encrypt("xptmxm", salt))
         .salt(salt)
         .name("테스트유저")
-        .email("test@naver.com")
+        .email("test@example.com")
         .phoneNumber("01012345678")
         .build();
   }

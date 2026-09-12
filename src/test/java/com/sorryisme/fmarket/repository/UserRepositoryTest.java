@@ -81,7 +81,7 @@ class UserRepositoryTest {
         storeRepository.save(
             Store.builder()
                 .storeName("테스트 상점")
-                .logoUrl("https://naver.com/test.jpg")
+                .logoUrl("https://example.com/test.jpg")
                 .description("테스트 상점 설명")
                 .businessNumber("123-89-12345")
                 .userId(user.getId())

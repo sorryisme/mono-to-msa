@@ -27,7 +27,7 @@ public class DomainFixture {
         .password("xptmxmqlalfqjsgh!")
         .salt("testSalt")
         .name("테스트유저")
-        .email("test@naver.com")
+        .email("test@example.com")
         .phoneNumber("01012345678")
         .build();
   }
