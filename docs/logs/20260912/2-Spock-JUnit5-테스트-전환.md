@@ -80,7 +80,38 @@ OrderServiceTest > createOrder는 옵션 ID 오름차순으로 재고를 차감�
 
 - `scripts/guard-scan.sh`, `scripts/verify-full.sh`, `.claude/hooks/*.sh` 의 `*.groovy` 패턴은 그대로 두었다.
   매칭될 파일이 없어 무해하고, 스크립트 동작을 건드리지 않는 편이 안전하다.
-- `docs/PROJECT_ANALYSIS.md` 는 2026-09-11 시점 스냅샷 문서이므로 수정하지 않았다
-  (이미 MyBatis·Boot 3.3.5 기준으로 현재 코드와 어긋나 있다).
 - 테스트를 새로 쓸 때의 관례는 `docs/TESTING.md` 에 모아 두었다 — 특히
   `MockitoExtension` 을 쓰지 않는 이유와 `InOrder` 로 고정한 순서 계약은 지워지면 안 된다.
+
+## 7. 후속 작업 (같은 날 처리)
+
+전환 직후 남겨 두었던 두 항목을 이어서 처리했다.
+
+### 7.1 테스트 픽스처의 외부 도메인 정리
+
+`guard-scan.sh` 가 `UserRepositoryTest`·`UserServiceTest` 의 `logoUrl("https://naver.com/test.jpg")` 를
+"외부 URL 하드코딩" 으로 경고했다(ERROR 아님). 규칙은 `example.com`/`example.org` 를 허용 목록에 두고 있고,
+테스트 픽스처를 실제 타사 도메인에 걸어 두는 것 자체가 바람직하지 않으므로 RFC 2606 예약 도메인으로 바꿨다.
+
+같은 성격의 문제인 이메일 픽스처(`@naver.com`)도 함께 정리했다 — `DomainFixture`, `UserServiceTest`,
+`data.sql` 시드. guard-scan 은 이메일을 검사하지 않으므로 경고 해소와는 무관한, 일관성을 위한 변경이다.
+`data.sql` 이 바뀌었으므로 `@DataJpaTest` 계열을 포함한 전체 테스트를 다시 돌려 확인했다.
+
+결과: `guard-scan.sh` 가 `src` 전체에서 경고 0건, 테스트 90개 전부 통과.
+
+### 7.2 PROJECT_ANALYSIS.md 갱신
+
+2026-09-10 작성 이후 갱신되지 않아 MyBatis·Spock·Boot 3.3.5 기준으로 현재 코드와 어긋나 있었다.
+코드를 다시 조사해 다음을 반영했다.
+
+- 기술 스택·의존성·패키지 트리를 JPA·JUnit 5 기준으로 교체 (`mapper/`·`domain/` → `entity/`·`repository/`,
+  예외 4종 → `BusinessException`, `enums` 3종, `common/dto`)
+- 09-11~12 주요 변경 이력 표 추가
+- 3.1 절을 비관적 락 서술에서 **조건부 원자적 UPDATE** 서술로 교체. 멱등성 판정이
+  `SELECT ... FOR UPDATE` 가 아니라 유니크 제약 위반 해석이라는 점, 옵션 ID 오름차순 차감이
+  데드락 회피 계약이라는 점, `cancelOrder` 가 상태 전이를 재고 복구보다 먼저 하는 이유를 명시
+- 페이지네이션 안정성(`PageableSupport`)·검증 자동화 절 신설, API 엔드포인트 표 추가
+- "개선 여지" 절 신설
+
+조사 중 확인한 사실 하나: `POST /orders` 는 주문 **생성**이 아니라 목록 검색이다(생성은 `POST /orders/create`).
+엔드포인트 이름만 보면 생성으로 읽히므로 문서에 명시하고 개선 여지로 남겼다.
