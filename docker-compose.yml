@@ -78,7 +78,7 @@ services:
       - db-replica
     networks:
       - mysql-network
-    command: ["./scripts/wait-for-it.sh", "db-replica:3307", "--", "java", "-jar", "app.jar"]
+    command: ["./scripts/wait-for-it.sh", "db-replica:3306", "--", "java", "-jar", "app.jar"]
 volumes:
   db_master_data:
   db_replica_data:
