@@ -1,8 +1,9 @@
-import com.sorryisme.fmarket.FmarketApplication;
+package com.sorryisme.fmarket;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest(classes = FmarketApplication.class)
+@SpringBootTest
 class FmarketApplicationTests {
 
   @Test

@@ -2,7 +2,6 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '4.1.1'
     id 'io.spring.dependency-management' version '1.1.7'
-    id 'groovy'
     id 'com.diffplug.spotless' version '8.10.2'
 }
 
@@ -47,8 +46,7 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-data-jpa-test'
     // @WebMvcTest 슬라이스도 Boot 4 부터 별도 모듈이다.
     testImplementation 'org.springframework.boot:spring-boot-webmvc-test'
-    testImplementation 'org.spockframework:spock-core:2.4-groovy-5.0'
-    testImplementation 'org.spockframework:spock-spring:2.4-groovy-5.0'
+    // JUnit 5·Mockito·AssertJ 는 spring-boot-starter-test 에 포함되어 있어 별도 선언하지 않는다.
 }
 
 // 자격증명은 .env 에만 둔다(.gitignore 대상). application.yml 은 기본값을 갖지 않으므로
@@ -77,10 +75,6 @@ tasks.named('bootRun') {
 }
 
 tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-}
-
-tasks.withType(GroovyCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
