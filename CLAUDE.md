@@ -6,7 +6,7 @@ OS - Window 11
 
 ## 프로젝트 개요
 이 프로젝트는 Spring Boot 기반 이커머스 백엔드입니다 (장바구니/주문/상품/유저).
-Java 21, Spring Boot 4.1, Spring Data JPA(Hibernate), MySQL 8.4, 테스트는 Spock 사용
+Java 21, Spring Boot 4.1, Spring Data JPA(Hibernate), MySQL 8.4, 테스트는 JUnit 5 · Mockito 사용
 
 ## 문서 구성
 
@@ -14,11 +14,11 @@ Java 21, Spring Boot 4.1, Spring Data JPA(Hibernate), MySQL 8.4, 테스트는 Sp
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — 레이어드 아키텍처, 패키지 구성, 읽기/쓰기 DB 라우팅, 멱등성/락, 인증
 - [docs/API_RESPONSE.md](docs/API_RESPONSE.md) — API 응답 봉투 형식, HTTP 상태와 본문 `code`(ErrorCode) 계약, 예외 핸들러 매핑 (응답/예외를 건드릴 때 반드시 준수)
 - [docs/CODE_STYLE.md](docs/CODE_STYLE.md) — Spotless 포맷터, 로깅 컨벤션
-- [docs/TESTING.md](docs/TESTING.md) — Spock 테스트 관례
+- [docs/TESTING.md](docs/TESTING.md) — 테스트 관례 (JUnit 5·Mockito, 슬라이스 테스트 구성)
 - [docs/PROJECT_ANALYSIS.md](docs/PROJECT_ANALYSIS.md) — 코드베이스 분석 스냅샷
 - [docs/HOOKS.md](docs/HOOKS.md) — 단계별 hook 구성(SessionStart/PostToolUse/pre-commit/pre-push/CI/Stop), 금지 패턴 규칙, 예외 표식 `hook-allow:`
 - `.claude/skills/git-commit-convention/SKILL.md` — 브랜치 명명, 커밋 메시지 규칙 (커밋/브랜치 작업 시 참고)
-- `.claude/agents/java-spring-reviewer.md` — Java·Spring 구현/리뷰 서브에이전트 규약 (`java-spring-jpa` 스킬 기준 + MyBatis→JPA·Spock→JUnit 전환기 취급 규칙, 권한 경계, 보고 형식)
+- `.claude/agents/java-spring-reviewer.md` — Java·Spring 구현/리뷰 서브에이전트 규약 (`java-spring-jpa` 스킬 기준 + MyBatis→JPA 전환기 취급 규칙, 권한 경계, 보고 형식)
 
 ## 폴더 구조
 
@@ -54,14 +54,15 @@ f-market/
 │   │       ├── schema.sql / data.sql
 │   │       └── logback-spring.xml
 │   └── test/
-│       ├── groovy/com/sorryisme/fmarket/
+│       ├── java/com/sorryisme/fmarket/
+│       │   ├── FmarketApplicationTests    # 스모크 테스트 (@SpringBootTest)
+│       │   ├── common/             # PageableSupportTest (단위)
 │       │   ├── controller/         # ControllerResponseContractTest (@WebMvcTest, 봉투·201·401 계약)
 │       │   ├── entity/             # EntityMappingTest (@DataJpaTest, ddl-auto=validate 로 스키마 일치 검증)
 │       │   ├── exception/          # GlobalExceptionHandlerTest (@WebMvcTest, 오류 코드 → HTTP 상태 계약)
-│       │   ├── repository/         # Repository Spock 테스트 (@DataJpaTest, 실제 MySQL)
-│       │   ├── service/            # Service Spock 테스트 (Mock 기반)
+│       │   ├── repository/         # Repository 테스트 (@DataJpaTest, 실제 MySQL)
+│       │   ├── service/            # Service 테스트 (Mockito Mock 기반)
 │       │   └── testUtils/          # DomainFixture
-│       ├── java/                   # FmarketApplicationTests (스모크 테스트)
 │       ├── https/                  # products.http
 │       └── resources/application.yml
 ├── scripts/                        # 검증 스크립트 (hook / CI 공용) + wait-for-it.sh
