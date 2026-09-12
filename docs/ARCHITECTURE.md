@@ -31,7 +31,7 @@ f-market 백엔드의 아키텍처 상세 문서입니다. 프로젝트 개요�
 트랜잭션마다 마스터/레플리카를 선택합니다 — 즉 라우팅은 호출 위치가 아니라 서비스 메서드의 `@Transactional(readOnly = true)` 설정으로 제어됩니다.
 JPA 도입 후에도 `@Primary` DataSource 는 그대로 `LazyConnectionDataSourceProxy` 이므로 EntityManager 가 실제 커넥션을 얻는 시점(첫 쿼리)에 라우팅이 결정됩니다.
 `readOnly = true` 는 replica 라우팅과 동시에 Hibernate flush 를 끄므로, 쓰기 메서드에는 절대 붙이지 않습니다.
-Docker Compose에서 마스터는 `db-master:3306`, 레플리카는 `db-replica:3307`이며, 앱 컨테이너는 `scripts/wait-for-it.sh db-replica:3307`로 레플리카가 준비될 때까지 대기한 뒤 시작합니다.
+Docker Compose 내부에서 마스터와 레플리카는 각각 `db-master:3306`, `db-replica:3306`으로 접근합니다. 호스트에는 마스터 3306, 레플리카 3307 포트로 공개하며, 앱 컨테이너는 `scripts/wait-for-it.sh db-replica:3306`으로 레플리카가 준비될 때까지 대기한 뒤 시작합니다.
 
 ## 멱등성과 락 (주문 생성)
 

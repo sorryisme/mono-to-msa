@@ -11,11 +11,11 @@ cd "$PROJECT_DIR"
 rc=0
 step() { printf '\n%s▸ %s%s\n' "$C_DIM" "$1" "$C_OFF" >&2; }
 
-step "1/3 컴파일 (compileJava, compileTestGroovy)"
-if ./gradlew -q compileJava compileTestGroovy 2>&1 | tail -30; then
+step "1/3 컴파일 (compileJava, compileTestJava)"
+if ./gradlew -q compileJava compileTestJava 2>&1 | tail -30; then
   ok "컴파일 통과"
 else
-  err "컴파일 실패 - ./gradlew compileJava compileTestGroovy 로 확인하세요"
+  err "컴파일 실패 - ./gradlew compileJava compileTestJava 로 확인하세요"
   exit 1
 fi
 
