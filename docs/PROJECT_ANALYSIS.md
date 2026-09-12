@@ -93,7 +93,7 @@ src/main/java/com/sorryisme/fmarket/
 
 ### 3.2 읽기/쓰기 DB 라우팅
 - `ReplicationRoutingDataSource`(`AbstractRoutingDataSource` 상속)가 `TransactionSynchronizationManager.isCurrentTransactionReadOnly()` 값을 보고 `readOnly=true` 트랜잭션은 Replica 로, 그 외는 Master(Source)로 라우팅
-- `docker-compose.yml` 에 `mysql-master`(3306)·`mysql-replica`(3307) 컨테이너가 정의되어 있고, 앱 컨테이너는 `scripts/wait-for-it.sh db-replica:3307 -- java -jar app.jar` 로 Replica 가 준비된 후 기동
+- `docker-compose.yml` 에 `db-master`·`db-replica` 서비스가 정의되어 있다. 호스트에는 각각 3306·3307 포트로 공개하지만, Compose 내부에서 앱 컨테이너는 레플리카의 컨테이너 포트인 `db-replica:3306` 이 준비된 후 기동한다
 - `docker-init/master`, `docker-init/replica`, `mysql-config/*.cnf` 에 복제 초기화 스크립트와 MySQL 설정 존재
 
 ### 3.3 페이지네이션 안정성
@@ -104,7 +104,7 @@ src/main/java/com/sorryisme/fmarket/
 - 요청/응답 바디는 `ContentCachingRequestWrapper`/`ContentCachingResponseWrapper` 로 캐싱해 로깅한다. Spring Framework 7 에서 한도 없는 생성자가 제거되어 요청 캐시 상한을 64KB 로 명시해 두었다
 
 ### 3.5 검증 자동화 (hook / CI 공용)
-- `scripts/lint-changed.sh`, `scripts/test-affected.sh`, `scripts/verify-full.sh` 를 git hook(`.githooks/`)·Claude Code hook(`.claude/hooks/`)·CI(`.github/workflows/verify.yml`)가 함께 쓴다
+- git pre-commit 은 `scripts/lint-changed.sh`, pre-push 와 Claude Code Stop hook 은 `scripts/test-affected.sh`, CI 는 `scripts/verify-full.sh` 를 호출한다. 각 진입점이 `scripts/` 의 공통 검증 로직을 재사용한다
 - `scripts/guard-scan.sh` 가 금지 패턴(`System.out/err.print`, `printStackTrace`, 빈 catch, 테스트 skip 애노테이션, 자격증명·키 하드코딩, 외부 URL 하드코딩)을 검사한다. 예외는 해당 줄의 `// hook-allow: <사유>` 로만 허용 — 상세는 [HOOKS.md](HOOKS.md)
 
 ## 4. 눈에 띄는 개선 여지
