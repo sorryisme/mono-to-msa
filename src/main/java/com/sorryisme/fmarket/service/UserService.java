@@ -77,9 +77,7 @@ public class UserService {
             .findByLoginId(loginId)
             .orElseThrow(() -> new BusinessException(ErrorCode.LOGIN_FAILED));
 
-    String hashedPassword = PasswordCipher.encrypt(password, user.getSalt());
-
-    if (hashedPassword.equals(user.getPassword())) {
+    if (PasswordCipher.checkPassword(password, user.getPassword())) {
       return user.getId();
     }
 
