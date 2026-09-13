@@ -3,6 +3,7 @@ plugins {
     id 'org.springframework.boot' version '4.1.1'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'com.diffplug.spotless' version '8.10.2'
+    id 'jacoco'
 }
 
 group = 'com.sorryisme'
@@ -72,6 +73,80 @@ tasks.named('test') {
 
 tasks.named('bootRun') {
     dotenv.each { key, value -> environment(key, value) }
+}
+
+jacoco {
+    toolVersion = '0.8.13'
+}
+
+// 테스트를 돌리면 커버리지 리포트도 함께 만들어진다. 별도 태스크를 기억할 필요가 없다.
+tasks.named('test') {
+    finalizedBy tasks.named('jacocoTestReport')
+}
+
+// 로직이 없는 코드는 집계에서 뺀다. 포함하면 Lombok 생성 코드와 단순 데이터 홀더가
+// 수치를 왜곡해 실제로 테스트된 로직의 비율을 가린다.
+// 리포트와 검증이 같은 대상을 보도록 한 곳에 두고 양쪽에서 쓴다.
+def jacocoExcludes = [
+        '**/entity/**',
+        '**/dto/**',
+        '**/enums/**',
+        '**/config/**',
+        '**/annotation/**',
+        '**/FmarketApplication.class',
+        // 상수만 있는 홀더. dto/enums 와 같은 이유로 뺀다.
+        '**/common/AppConstants.class',
+]
+
+tasks.named('jacocoTestReport') {
+    dependsOn tasks.named('test')
+
+    reports {
+        // HTML 은 사람이 읽는 용도, XML 은 나중에 커버리지 수집 도구를 붙일 때 쓴다.
+        html.required = true
+        xml.required = true
+        csv.required = false
+    }
+
+    classDirectories.setFrom(
+            files(classDirectories.files.collect {
+                fileTree(dir: it, exclude: jacocoExcludes)
+            })
+    )
+}
+
+// 하한은 측정된 수치(LINE 99.4% / BRANCH 94.1%)보다 낮게 잡는다. 사소한 리팩터링마다
+// 빌드가 깨지면 개발자가 게이트를 우회하게 되고, 그러면 게이트가 있으나 마나 해진다.
+// 여기서 잡으려는 것은 커버리지가 큰 폭으로 조용히 내려가는 상황이다.
+tasks.named('jacocoTestCoverageVerification') {
+    dependsOn tasks.named('test')
+
+    violationRules {
+        rule {
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.95
+            }
+            limit {
+                counter = 'BRANCH'
+                value = 'COVEREDRATIO'
+                minimum = 0.90
+            }
+        }
+    }
+
+    classDirectories.setFrom(
+            files(classDirectories.files.collect {
+                fileTree(dir: it, exclude: jacocoExcludes)
+            })
+    )
+}
+
+// check 에 걸어 로컬 pre-push 와 CI 양쪽에서 강제한다(scripts/verify-full.sh 는
+// ./gradlew clean check 를 호출한다).
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestCoverageVerification')
 }
 
 tasks.withType(JavaCompile).configureEach {
