@@ -105,6 +105,8 @@ tasks.named('jacocoTestReport') {
                         '**/config/**',
                         '**/annotation/**',
                         '**/FmarketApplication.class',
+                        // 상수만 있는 홀더. dto/enums 와 같은 이유로 뺀다.
+                        '**/common/AppConstants.class',
                 ])
             })
     )
