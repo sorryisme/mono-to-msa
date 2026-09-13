@@ -3,6 +3,7 @@ plugins {
     id 'org.springframework.boot' version '4.1.1'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'com.diffplug.spotless' version '8.10.2'
+    id 'jacoco'
 }
 
 group = 'com.sorryisme'
@@ -73,6 +74,44 @@ tasks.named('test') {
 tasks.named('bootRun') {
     dotenv.each { key, value -> environment(key, value) }
 }
+
+jacoco {
+    toolVersion = '0.8.13'
+}
+
+// 테스트를 돌리면 커버리지 리포트도 함께 만들어진다. 별도 태스크를 기억할 필요가 없다.
+tasks.named('test') {
+    finalizedBy tasks.named('jacocoTestReport')
+}
+
+tasks.named('jacocoTestReport') {
+    dependsOn tasks.named('test')
+
+    reports {
+        // HTML 은 사람이 읽는 용도, XML 은 나중에 커버리지 수집 도구를 붙일 때 쓴다.
+        html.required = true
+        xml.required = true
+        csv.required = false
+    }
+
+    // 로직이 없는 코드는 집계에서 뺀다. 포함하면 Lombok 생성 코드와 단순 데이터 홀더가
+    // 수치를 왜곡해 실제로 테스트된 로직의 비율을 가린다.
+    classDirectories.setFrom(
+            files(classDirectories.files.collect {
+                fileTree(dir: it, exclude: [
+                        '**/entity/**',
+                        '**/dto/**',
+                        '**/enums/**',
+                        '**/config/**',
+                        '**/annotation/**',
+                        '**/FmarketApplication.class',
+                ])
+            })
+    )
+}
+
+// jacocoTestCoverageVerification 은 아직 check 에 걸지 않는다. 현재 수치를 먼저
+// 확인한 뒤 기준선을 정한다 — docs/todo/BACKLOG.md 참고.
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
