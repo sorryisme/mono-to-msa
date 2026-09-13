@@ -11,6 +11,7 @@
 ## 열린 항목
 
 - [ ] `jacocoTestCoverageVerification` 을 `check` 에 연결하고 커버리지 하한을 강제 — 배경: JaCoco 를 리포트 전용으로 먼저 도입했고(2026-09-13) 전체 테스트 기준선은 LINE 80.6% / BRANCH 72.1% 로 측정됐다. 하한을 걸어야 수치가 조용히 내려가는 것을 막는다 / 보류 사유: 게이트를 바로 걸면 `aop`·`controller` 처럼 지금 낮은 패키지 때문에 빌드가 깨지거나, 반대로 기준을 느슨하게 잡아 의미 없는 숫자가 된다. 아래 테스트 보강 항목을 먼저 처리한 뒤 정한다 / 관련: `build.gradle`, `docs/logs/20260913/1-JaCoco-커버리지-도입.md`
+- [ ] `UserService.login` 의 비밀번호 비교를 `PasswordCipher.checkPassword` 로 교체 — 배경: `login` 은 저장된 salt 로 직접 재해싱한 뒤 `String.equals` 로 비교한다. `BCrypt.checkpw` 가 하는 일을 손으로 다시 한 것이고 상수 시간 비교가 아니어서 타이밍 정보가 새어 나갈 여지가 있다. 그 결과 `PasswordCipher.checkPassword` 는 프로덕션 코드에서 아무도 쓰지 않는 상태다 / 보류 사유: 인증 경로 변경이라 utils 테스트 추가(2026-09-13) 범위를 넘어선다. 로그인 동작을 바꾸는 작업으로 따로 다룬다 / 관련: `src/main/java/com/sorryisme/fmarket/service/UserService.java:80`, `docs/logs/20260913/3-PasswordCipher-테스트-추가.md`
 - [ ] `controller` 패키지 테스트 보강 — 배경: 라인 커버리지 17.2%. 현재 `ControllerResponseContractTest` 는 응답 봉투·상태 코드 계약만 확인해 핸들러 본문을 거의 타지 않는다 / 보류 사유: 위와 동일하게 별도 테스트 작업 단위 / 관련: `src/test/java/com/sorryisme/fmarket/controller/`, `docs/logs/20260913/1-JaCoco-커버리지-도입.md`
 
 ## 완료 항목
