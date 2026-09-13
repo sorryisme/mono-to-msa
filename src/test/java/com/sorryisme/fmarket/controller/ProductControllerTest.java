@@ -84,9 +84,22 @@ class ProductControllerTest {
     assertThat(result.getResponse().getStatus()).isEqualTo(200);
   }
 
-  // 본문 없이 호출하는 경우는 테스트하지 않는다. @RequestBody(required = false) 로 본문을
-  // 선택으로 열어 뒀지만 ProductSearchDto.from 이 null 을 그대로 역참조해 500 이 난다.
-  // 결함이므로 현재 동작을 테스트로 고정하지 않고 docs/todo/BACKLOG.md 에 남겼다.
+  @Test
+  @DisplayName("상품 검색을 본문 없이 호출하면 조건 없는 전체 목록으로 조회한다")
+  void searchesWithoutBody() throws Exception {
+    when(productService.findAllProductList(any(ProductSearchDto.class)))
+        .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+    MvcResult result = mockMvc.perform(post("/api/v1/products/search")).andReturn();
+
+    ArgumentCaptor<ProductSearchDto> captor = ArgumentCaptor.forClass(ProductSearchDto.class);
+    verify(productService).findAllProductList(captor.capture());
+    assertThat(captor.getValue().getQuery()).isNull();
+    assertThat(captor.getValue().getMajorCategory()).isNull();
+    assertThat(captor.getValue().getSubcategory()).isNull();
+    assertThat(captor.getValue().getPageable()).isNotNull();
+    assertThat(result.getResponse().getStatus()).isEqualTo(200);
+  }
 
   @Test
   @DisplayName("상품 단건 조회는 경로 변수 id 로 조회한다")
