@@ -84,18 +84,22 @@ tasks.named('test') {
     finalizedBy tasks.named('jacocoTestReport')
 }
 
-// 로직이 없는 코드는 집계에서 뺀다. 포함하면 Lombok 생성 코드와 단순 데이터 홀더가
-// 수치를 왜곡해 실제로 테스트된 로직의 비율을 가린다.
+// 로직이 없는 코드만 클래스 단위로 집계에서 뺀다.
+// 패키지 단위(entity/dto/config)로 빼면 그 안에 있는 금액 계산·상태 전이·입력 경계 검사·
+// 읽기/쓰기 DB 라우팅까지 함께 빠져, 게이트가 정작 지켜야 할 코드를 보지 못한다.
+// Lombok 생성 메서드는 lombok.config 의 @Generated 표식으로, record·enum 의 컴파일러 생성 메서드는
+// JaCoCo 필터로 자동 제외되므로 여기 적지 않는다.
+// 새 클래스를 여기 추가할 때는 "분기·계산·예외가 전혀 없는가"를 기준으로 판단한다.
 // 리포트와 검증이 같은 대상을 보도록 한 곳에 두고 양쪽에서 쓴다.
 def jacocoExcludes = [
-        '**/entity/**',
-        '**/dto/**',
-        '**/enums/**',
-        '**/config/**',
-        '**/annotation/**',
+        // 실행 진입점
         '**/FmarketApplication.class',
-        // 상수만 있는 홀더. dto/enums 와 같은 이유로 뺀다.
+        // 애노테이션 선언과 상수 홀더
+        '**/annotation/**',
         '**/common/AppConstants.class',
+        // 프로퍼티를 바인딩해 빈을 조립하기만 한다. 실제 연결은 @SpringBootTest 스모크 테스트가 본다.
+        '**/config/DataSourceConfiguration.class',
+        '**/config/WebConfig.class',
 ]
 
 tasks.named('jacocoTestReport') {
@@ -115,9 +119,10 @@ tasks.named('jacocoTestReport') {
     )
 }
 
-// 하한은 측정된 수치(LINE 99.4% / BRANCH 94.1%)보다 낮게 잡는다. 사소한 리팩터링마다
-// 빌드가 깨지면 개발자가 게이트를 우회하게 되고, 그러면 게이트가 있으나 마나 해진다.
+// 하한은 측정된 수치(LINE 97.1% / BRANCH 96.1%, 2026-09-14 제외 범위 축소 후)보다 낮게 잡는다.
+// 사소한 리팩터링마다 빌드가 깨지면 개발자가 게이트를 우회하게 되고, 그러면 게이트가 있으나 마나 해진다.
 // 여기서 잡으려는 것은 커버리지가 큰 폭으로 조용히 내려가는 상황이다.
+// 분기는 전체 100개 남짓이라 1개가 약 1%p 다. BRANCH 92% 는 지금보다 분기 4개 정도를 더 놓칠 여유다.
 tasks.named('jacocoTestCoverageVerification') {
     dependsOn tasks.named('test')
 
@@ -131,7 +136,7 @@ tasks.named('jacocoTestCoverageVerification') {
             limit {
                 counter = 'BRANCH'
                 value = 'COVEREDRATIO'
-                minimum = 0.90
+                minimum = 0.92
             }
         }
     }

@@ -10,7 +10,8 @@
 
 ## 열린 항목
 
-(없음)
+- [ ] 호출처 없는 엔티티 변경 메서드 정리 (`User.changePassword`, `User.softDelete`, `Store.updateStoreInfo`, `ProductReview.updateReview`) — 배경: 커버리지 제외 범위를 좁힌 뒤 미커버로 드러났고, 프로덕션 코드에서 호출하는 곳이 없다 / 보류 사유: 비밀번호 변경·회원 탈퇴·스토어·리뷰 수정 기능을 앞으로 만들지에 따라 "삭제"와 "기능 구현 + 테스트" 중 방향이 갈려 사용자 판단이 필요하다 / 관련: `docs/logs/20260914/1-커버리지-제외-범위-축소와-주문-입력-검증-수정.md`
+- [ ] 커버리지 게이트(`check`)가 실제 MySQL 에 의존하지 않게 하기 — 배경: `repository/**`·`EntityMappingTest` 가 실제 MySQL 을 써서 DB 가 없으면 로컬 `check`·pre-push 가 전부 실패한다 / 보류 사유: Testcontainers 도입 또는 DB 테스트 태스크 분리 중 방식 결정이 필요하고, CI 는 이미 컨테이너로 DB 를 띄워 동작한다 / 관련: `docs/logs/20260914/1-커버리지-제외-범위-축소와-주문-입력-검증-수정.md`, `.github/workflows/verify.yml`
 
 ## 완료 항목
 

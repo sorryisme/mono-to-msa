@@ -17,8 +17,12 @@ import com.sorryisme.fmarket.dto.response.OrderListResponseDto;
 import com.sorryisme.fmarket.dto.response.OrderResponseDto;
 import com.sorryisme.fmarket.service.OrderService;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -129,6 +133,38 @@ class OrderControllerTest {
     verify(orderService).createOrder(eq(VALID_KEY), eq(42L), captor.capture());
     assertThat(captor.getValue().toProductQuantityMap()).containsEntry(1000L, 2);
     assertThat(result.getResponse().getStatus()).isEqualTo(201);
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("invalidOrderItems")
+  @DisplayName("주문 항목이 잘못되면 서비스까지 보내지 않고 INVALID_INPUT 400 으로 응답한다")
+  void rejectsInvalidOrderItems(String description, String body) throws Exception {
+    when(sessionManager.getUserId()).thenReturn(42L);
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                post("/api/v1/orders/create")
+                    .header("Idempotency-Key", VALID_KEY)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+            .andReturn();
+
+    assertThat(result.getResponse().getStatus()).isEqualTo(400);
+    assertThat(result.getResponse().getContentAsString()).contains("\"code\":\"INVALID_INPUT\"");
+    verifyNoInteractions(orderService);
+  }
+
+  static Stream<Arguments> invalidOrderItems() {
+    return Stream.of(
+        // 통과하면 조건부 차감 UPDATE 가 재고를 늘리고 총액이 음수가 된다.
+        Arguments.of("음수 수량", "{\"orderItems\":[{\"productOptionId\":1000,\"quantity\":-5}]}"),
+        Arguments.of("수량 0", "{\"orderItems\":[{\"productOptionId\":1000,\"quantity\":0}]}"),
+        // 통과하면 수량 맵을 만들 때 키 충돌로 500 이 난다.
+        Arguments.of(
+            "같은 옵션 중복",
+            "{\"orderItems\":[{\"productOptionId\":1000,\"quantity\":1},"
+                + "{\"productOptionId\":1000,\"quantity\":2}]}"));
   }
 
   @Test

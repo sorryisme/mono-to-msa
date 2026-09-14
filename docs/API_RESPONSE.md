@@ -78,7 +78,7 @@ f-market REST API 의 응답 형식과 오류 코드 계약입니다. 이 문서
 
 | code | HTTP | 발생 상황 |
 |---|---|---|
-| `INVALID_INPUT` | 400 | `@Valid` 실패, JSON 파싱 실패, 필수 파라미터 누락, 수량 0 이하 등 값 자체가 잘못된 경우 |
+| `INVALID_INPUT` | 400 | `@Valid` 실패, JSON 파싱 실패, 필수 파라미터 누락, 수량 0 이하, 주문 항목에 같은 상품 옵션 중복 등 값 자체가 잘못된 경우 |
 | `RESOURCE_NOT_FOUND` | 404 | 매핑되지 않은 경로 등 프레임워크가 404 로 판정한 요청 |
 | `METHOD_NOT_ALLOWED` | 405 | 지원하지 않는 HTTP 메서드 |
 | `INVALID_STATE` | 409 | 도메인 코드에 해당하지 않는 상태 규칙 위반(엔티티 `IllegalStateException` 안전망) |

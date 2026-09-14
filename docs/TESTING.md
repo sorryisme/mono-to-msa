@@ -11,3 +11,5 @@
 - 리포지토리 테스트는 `@DataJpaTest` + `@AutoConfigureTestDatabase(replace = NONE)`으로 `src/test/resources/application.yml`에 설정된 실제 MySQL을 사용합니다. 각 테스트는 트랜잭션 안에서 실행되고 끝나면 롤백됩니다. `schema.sql`/`data.sql` 이 컨텍스트마다 다시 적용되므로 `data.sql` 의 시드(user 1, product 1, product_option 1·2, 카테고리 8종)를 전제로 써도 됩니다.
 - `entity/EntityMappingTest` 는 `spring.jpa.hibernate.ddl-auto=validate` 로 컨텍스트를 띄워 모든 엔티티 매핑이 `schema.sql` 과 일치하는지 검증합니다. 엔티티나 스키마를 바꿨다면 이 테스트가 먼저 깨집니다.
 - `testUtils/DomainFixture.java`가 엔티티 픽스처(`User`, `Cart`, `Order` 등) 생성을 한곳에 모아둡니다 — 새 테스트에서 엔티티를 직접 만들지 말고 이걸 재사용하세요. 단위 테스트에서 id 가 필요하면 id 를 받는 오버로드를 씁니다.
+- 커버리지(JaCoCo)는 로직이 없는 클래스만 `build.gradle` 의 `jacocoExcludes` 에 클래스 단위로 뺍니다. `entity`·`dto`·`config` 를 패키지째 빼지 마세요 — 금액 계산(`Order.of`)·상태 전이·입력 경계·DB 라우팅이 함께 빠집니다. Lombok 생성 메서드는 `lombok.config` 의 `@Generated` 표식으로 자동 제외되므로 따로 적지 않습니다. 엔티티·DTO 에 분기나 계산을 넣었다면 DB 없이 도는 단위 테스트(`entity/OrderTest` 등)를 함께 추가합니다.
+- 커버리지 수치는 "호출됐는가"만 말해 줍니다. 새 테스트는 정상·실패·경계 조건을 나누고, 상태 변화와 부작용(저장 호출, 재고 증감, 서비스 미호출 등)을 단언까지 해야 합니다.
