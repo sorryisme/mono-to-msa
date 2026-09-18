@@ -7,11 +7,15 @@ spring:
       jdbc-url: jdbc:mysql://${MYSQL_MASTER_HOST:db-master}:${MYSQL_MASTER_PORT:3306}/${MYSQL_DATABASE:fmarket}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true
       username: ${MYSQL_USER:sorry}
       password: ${MYSQL_PASSWORD}
+      # HikariCP 지표는 pool 이름으로만 구분된다. 지정하지 않으면 양쪽이 HikariPool-1/2 로 잡혀
+      # 어느 쪽이 source 이고 replica 인지 지표에서 식별할 수 없다.
+      pool-name: fmarket-source
     replica:
       driver-class-name: com.mysql.cj.jdbc.Driver
       jdbc-url: jdbc:mysql://${MYSQL_REPLICA_HOST:db-replica}:${MYSQL_REPLICA_PORT:3306}/${MYSQL_DATABASE:fmarket}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true
       username: ${MYSQL_USER:sorry}
       password: ${MYSQL_PASSWORD}
+      pool-name: fmarket-replica
   jpa:
     # 스키마는 schema.sql 이 관리한다. Hibernate 가 운영 스키마를 건드리지 않게 none 으로 고정한다.
     hibernate:
@@ -24,3 +28,49 @@ spring:
   sql:
     init:
       mode: always
+
+# 관측성 (Actuator + Micrometer)
+# 이 프로젝트에는 인증/인가 계층이 없어 서비스 포트에 지표를 같이 열면 그대로 외부에 노출된다.
+# 관리 엔드포인트는 별도 포트로 분리하고, 기본 접근을 none 으로 막은 뒤 필요한 것만 읽기 전용으로 연다.
+management:
+  server:
+    port: ${MANAGEMENT_PORT:8081}
+  endpoints:
+    access:
+      default: none
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      access: read-only
+      # 부하 실행 전 readiness 확인에 쓴다. DataSource 별 health 가 함께 잡혀
+      # source/replica 양쪽 연결을 한 번에 확인할 수 있다.
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+    info:
+      access: read-only
+    metrics:
+      access: read-only
+    prometheus:
+      access: read-only
+  info:
+    build:
+      enabled: true
+  # k6 가 재는 percentile 은 클라이언트 관점(네트워크·대기 포함)이다.
+  # 서버 관점 분포를 따로 보려면 histogram 을 켜야 한다. 버킷이 무한정 늘지 않게 상·하한을 준다.
+  metrics:
+    # 모든 meter 에 붙는 공통 태그. observations.key-values 는 Observation 기반 지표
+    # (http.server.requests 등)에만 적용돼 JVM·HikariCP 지표에는 붙지 않는다.
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      minimum-expected-value:
+        http.server.requests: 5ms
+      maximum-expected-value:
+        http.server.requests: 10s

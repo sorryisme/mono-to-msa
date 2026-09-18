@@ -32,6 +32,10 @@ dependencies {
     implementation 'org.springframework.security:spring-security-crypto'
     implementation 'org.springframework.boot:spring-boot-starter-aspectj'
     implementation 'org.springframework.data:spring-data-commons' //페이지네이션 용도
+    // 부하 테스트 중 JVM·HikariCP·HTTP 지표를 서버 쪽에서 수집하기 위한 최소 구성.
+    // actuator 가 Micrometer core 를, prometheus 레지스트리가 스크레이프 엔드포인트를 제공한다.
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
     runtimeOnly 'com.h2database:h2'
@@ -64,6 +68,12 @@ if (dotenvFile.exists()) {
             dotenv[trimmed.substring(0, idx).trim()] = trimmed.substring(idx + 1).trim()
         }
     }
+}
+
+// 측정 결과를 어떤 빌드에서 얻었는지 남기기 위해 build-info.properties 를 생성한다.
+// /actuator/info 가 이 값을 읽어 버전·빌드 시각을 노출한다.
+springBoot {
+    buildInfo()
 }
 
 tasks.named('test') {
