@@ -5,10 +5,17 @@
 // 매 iteration 마다 jar 에 다시 넣어야 한다(경합 시나리오).
 
 import http from 'k6/http';
+import { check } from 'k6';
+import { Counter } from 'k6/metrics';
 import { BASE_URL, USER_PASSWORD } from './config.js';
 import { params, isOk } from './http.js';
 
 const SESSION_COOKIE = 'JSESSIONID';
+
+// 로그인 요청은 phase:login/setup 태그라 본 측정 threshold(checks{phase:main}) 밖에 있다.
+// 일부 VU 만 로그인에 실패하면 나머지 VU 가 모든 threshold 를 통과해 "성공" 으로 끝날 수 있으므로
+// 실패를 별도 카운터로 세고 baseThresholds 가 count==0 을 강제한다.
+export const loginFailures = new Counter('login_failures');
 
 /**
  * 로그인하고 세션 쿠키 값을 돌려준다. 실패하면 null. phase 태그로 본 측정에서 분리된다.
@@ -23,13 +30,18 @@ export function login(loginId, phase = 'login', freshJar = false) {
     JSON.stringify({ loginId, password: USER_PASSWORD }),
     params(phase, 'POST /api/v1/user/login', extra),
   );
-  if (!isOk(res)) {
-    console.error(`login failed: loginId=${loginId} status=${res.status} body=${res.body}`);
-    return null;
-  }
   const cookies = res.cookies[SESSION_COOKIE];
-  if (!cookies || cookies.length === 0) {
-    console.error(`login response has no ${SESSION_COOKIE}: loginId=${loginId}`);
+  const ok = check(
+    res,
+    {
+      'login 200 OK': (r) => isOk(r),
+      'login sets session cookie': () => !!cookies && cookies.length > 0,
+    },
+    { phase },
+  );
+  if (!ok) {
+    loginFailures.add(1);
+    console.error(`login failed: loginId=${loginId} status=${res.status} body=${res.body}`);
     return null;
   }
   return cookies[0].value;

@@ -72,10 +72,20 @@ jobs:
           if-no-files-found: warn
 
       # 스크립트의 trap 이 정리하지만, 러너가 스크립트를 중간에 죽였을 때를 대비한다.
-      # 남은 fmarket-load-* 프로젝트만 지운다. 결과(종료 코드)에는 영향을 주지 않는다.
+      # `docker compose down` 은 Compose 파일을 다시 해석하면서 앞 단계에서만 export 된 변수(RUN_ID 등)를 요구하므로
+      # 여기서는 Compose 를 거치지 않고 프로젝트 라벨(com.docker.compose.project)로 자원을 직접 지운다.
+      # 남은 fmarket-load-* 프로젝트만 대상이고, 결과(종료 코드)에는 영향을 주지 않는다.
       - name: 잔여 컨테이너 정리
         if: always()
         run: |
-          for p in $(docker compose ls -a --format '{{.Name}}' 2>/dev/null | grep '^fmarket-load-' || true); do
-            docker compose -p "$p" -f performance/docker-compose.loadtest.yml down -v --rmi local --remove-orphans || true
+          projects=$(docker ps -a --filter 'label=com.docker.compose.project' \
+                       --format '{{.Label "com.docker.compose.project"}}' | sort -u | grep '^fmarket-load-' || true)
+          for p in $projects; do
+            echo "cleanup: $p"
+            f="label=com.docker.compose.project=$p"
+            # -v: 이미지의 VOLUME 으로 생긴 익명 볼륨(MySQL 데이터)도 함께 지운다.
+            docker rm -f -v $(docker ps -aq --filter "$f") 2>/dev/null || true
+            docker volume rm $(docker volume ls -q --filter "$f") 2>/dev/null || true
+            docker network rm $(docker network ls -q --filter "$f") 2>/dev/null || true
+            docker image rm $(docker image ls -q --filter "$f") 2>/dev/null || true
           done

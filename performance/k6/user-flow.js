@@ -8,6 +8,7 @@
 // 사후 검증(verify-user-flow.sql): 주문 수 = k6 가 받은 201 수(응답 유실분은 상한으로 허용), 재고 차감 합 = 주문 수량 합.
 
 import http from 'k6/http';
+import exec from 'k6/execution';
 import { sleep } from 'k6';
 import { Counter } from 'k6/metrics';
 import { BASE_URL, intEnv, strEnv, listEnv, requireEnv, userLoginId, assertUsersAvailable } from './lib/config.js';
@@ -53,8 +54,9 @@ export default function () {
   if (!loggedIn) {
     const sid = login(userLoginId(__VU));
     if (sid === null) {
-      // 로그인 실패는 이후 요청을 401 로 만들어 실패율을 오염시키므로 여기서 멈춘다.
-      throw new Error(`VU ${__VU} 로그인 실패`);
+      // 예외로 iteration 만 끝내면 나머지 VU 가 threshold 를 다 통과해 실행이 "성공" 으로 끝날 수 있다.
+      // 로그인 실패는 측정 조건 자체가 깨진 것이므로 실행을 중단한다 (login_failures threshold 와 이중 안전장치).
+      exec.test.abort(`VU ${__VU} 로그인 실패 (${userLoginId(__VU)})`);
     }
     loggedIn = true;
   }
