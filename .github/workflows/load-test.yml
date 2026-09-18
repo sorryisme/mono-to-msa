@@ -1,0 +1,81 @@
+# 부하 테스트 워크플로. 기존 verify 와 별도로 돈다.
+#   - pull_request: smoke 만 (기동 실패·심각한 회귀 감지용 임시 안전선. 절대 TPS 를 게이트하지 않는다)
+#   - workflow_dispatch: 시나리오·VU·duration 을 제한적으로 받는다. 외부 대상 URL 은 받지 않는다.
+#   nightly 스케줄, stress/soak, 전용 러너는 docs/todo/BACKLOG.md 참고.
+#
+# 자격증명은 scripts/load-test.sh 가 실행마다 새로 만들고 컨테이너와 함께 사라진다. GitHub Secrets 불필요.
+# 합격/불합격은 스크립트 종료 코드로 전달된다 (k6 threshold + DB 불변식). 정리·아티팩트 단계는 결과를 바꾸지 않는다.
+name: load-test
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: 실행할 시나리오
+        type: choice
+        required: true
+        default: smoke
+        options: [smoke, user-flow, order-contention, idempotency, order-race]
+      vus:
+        description: VU 수 (비우면 시나리오 기본값)
+        type: string
+        default: ''
+      duration:
+        description: 지속 시간 (smoke, user-flow 만. 예 60s)
+        type: string
+        default: ''
+      users:
+        description: fixture 사용자 수 (VU 이상)
+        type: string
+        default: '100'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SCENARIO: ${{ github.event_name == 'workflow_dispatch' && inputs.scenario || 'smoke' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: 스크립트 실행 권한 설정
+        run: chmod +x gradlew scripts/*.sh
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: 부하 테스트 실행
+        run: |
+          args=()
+          [ -n "${{ inputs.vus }}" ] && args+=(--vus "${{ inputs.vus }}")
+          [ -n "${{ inputs.duration }}" ] && args+=(--duration "${{ inputs.duration }}")
+          [ -n "${{ inputs.users }}" ] && args+=(--users "${{ inputs.users }}")
+          bash scripts/load-test.sh "$SCENARIO" "${args[@]}"
+
+      # jar 이미지 컨텍스트는 크지 않지만 아티팩트에는 필요 없다.
+      - name: 결과 아티팩트 업로드 (k6 요약·검증·앱 로그)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: load-test-${{ env.SCENARIO }}-${{ github.run_number }}
+          path: |
+            build/loadtest/**
+            !build/loadtest/**/image/**
+          if-no-files-found: warn
+
+      # 스크립트의 trap 이 정리하지만, 러너가 스크립트를 중간에 죽였을 때를 대비한다.
+      # 남은 fmarket-load-* 프로젝트만 지운다. 결과(종료 코드)에는 영향을 주지 않는다.
+      - name: 잔여 컨테이너 정리
+        if: always()
+        run: |
+          for p in $(docker compose ls -a --format '{{.Name}}' 2>/dev/null | grep '^fmarket-load-' || true); do
+            docker compose -p "$p" -f performance/docker-compose.loadtest.yml down -v --rmi local --remove-orphans || true
+          done
