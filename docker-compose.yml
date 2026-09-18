@@ -70,6 +70,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
+      # Actuator 관리 포트. 지표 스크레이프는 이쪽으로만 한다.
+      - "8081:8081"
     # DB 자격증명은 .env 에서 주입한다 (application.yml 은 기본값만 가진다)
     env_file:
       - .env

@@ -14,4 +14,5 @@ COPY ./scripts/wait-for-it.sh ./scripts/wait-for-it.sh
 
 RUN chmod +x scripts/wait-for-it.sh
 
-EXPOSE 8080
+# 8080 은 서비스, 8081 은 Actuator 관리 포트(management.server.port)
+EXPOSE 8080 8081
