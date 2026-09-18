@@ -8,12 +8,19 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.ContentCachingRequestWrapper;
 import org.springframework.web.util.ContentCachingResponseWrapper;
 
+/**
+ * 요청마다 MDC(request_UUID, method, uri) 를 채우고 요청/응답을 로그로 남긴다.
+ *
+ * <p>{@code fmarket.http-log.body-enabled} 가 false 이면(부하 테스트 프로파일) 본문 캐싱 wrapper 자체를 만들지 않고 상태 코드와
+ * 소요 시간만 남긴다. 로그 레벨만 낮추면 wrapper 생성과 본문 문자열화 비용이 그대로 남아 측정값을 왜곡하기 때문이다.
+ */
 @Component
 @Slf4j
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -27,37 +34,67 @@ public class MDCLoggingFilter implements Filter {
   // 캐시 상한을 명시해야 한다. 요청 바디는 로그로만 쓰이므로 상한을 두는 편이 안전하다.
   private static final int REQUEST_CACHE_LIMIT_BYTES = 64 * 1024;
 
+  private final boolean bodyLoggingEnabled;
+
+  public MDCLoggingFilter(
+      @Value("${fmarket.http-log.body-enabled:true}") boolean bodyLoggingEnabled) {
+    this.bodyLoggingEnabled = bodyLoggingEnabled;
+  }
+
   @Override
   public void doFilter(
       ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain)
       throws IOException, ServletException {
 
-    ContentCachingRequestWrapper wrappedRequest =
-        new ContentCachingRequestWrapper(
-            (HttpServletRequest) servletRequest, REQUEST_CACHE_LIMIT_BYTES);
-    ContentCachingResponseWrapper wrappedResponse =
-        new ContentCachingResponseWrapper((HttpServletResponse) servletResponse);
+    HttpServletRequest request = (HttpServletRequest) servletRequest;
+    HttpServletResponse response = (HttpServletResponse) servletResponse;
 
     MDC.put(MDC_REQUEST_UUID, UUID.randomUUID().toString());
-    MDC.put(MDC_URI, wrappedRequest.getRequestURI());
-    MDC.put(MDC_METHOD, wrappedRequest.getMethod());
+    MDC.put(MDC_URI, request.getRequestURI());
+    MDC.put(MDC_METHOD, request.getMethod());
     long startTime = System.currentTimeMillis();
 
     try {
-      filterChain.doFilter(wrappedRequest, wrappedResponse);
+      if (bodyLoggingEnabled) {
+        doFilterWithBodyLogging(request, response, filterChain, startTime);
+      } else {
+        doFilterCompact(request, response, filterChain, startTime);
+      }
     } finally {
-      long processingTime = System.currentTimeMillis() - startTime;
-      loggingRequestResponse(wrappedRequest, wrappedResponse, processingTime);
-      wrappedResponse.copyBodyToResponse();
       MDC.clear();
     }
   }
 
-  private void loggingRequestResponse(
-      ContentCachingRequestWrapper wrappedRequest,
-      ContentCachingResponseWrapper wrappedResponse,
-      long elapsedTime) {
-    log.info(toString(wrappedRequest, wrappedResponse, elapsedTime));
+  private void doFilterWithBodyLogging(
+      HttpServletRequest request,
+      HttpServletResponse response,
+      FilterChain filterChain,
+      long startTime)
+      throws IOException, ServletException {
+    ContentCachingRequestWrapper wrappedRequest =
+        new ContentCachingRequestWrapper(request, REQUEST_CACHE_LIMIT_BYTES);
+    ContentCachingResponseWrapper wrappedResponse = new ContentCachingResponseWrapper(response);
+    try {
+      filterChain.doFilter(wrappedRequest, wrappedResponse);
+    } finally {
+      long processingTime = System.currentTimeMillis() - startTime;
+      log.info(toString(wrappedRequest, wrappedResponse, processingTime));
+      wrappedResponse.copyBodyToResponse();
+    }
+  }
+
+  private void doFilterCompact(
+      HttpServletRequest request,
+      HttpServletResponse response,
+      FilterChain filterChain,
+      long startTime)
+      throws IOException, ServletException {
+    try {
+      filterChain.doFilter(request, response);
+    } finally {
+      long processingTime = System.currentTimeMillis() - startTime;
+      log.info("status={} elapsedMs={}", response.getStatus(), processingTime);
+    }
   }
 
   private String getRequestBody(ContentCachingRequestWrapper requestWrapper) {

@@ -1,0 +1,104 @@
+# 부하 테스트 워크플로. 기존 verify 와 별도로 돈다.
+#   - pull_request: smoke 만 (기동 실패·심각한 회귀 감지용 임시 안전선. 절대 TPS 를 게이트하지 않는다)
+#   - workflow_dispatch: 시나리오·VU·duration 을 제한적으로 받는다. 외부 대상 URL 은 받지 않는다.
+#   nightly 스케줄, stress/soak, 전용 러너는 docs/todo/BACKLOG.md 참고.
+#
+# 자격증명은 scripts/load-test.sh 가 실행마다 새로 만들고 컨테이너와 함께 사라진다. GitHub Secrets 불필요.
+# 합격/불합격은 스크립트 종료 코드로 전달된다 (k6 threshold + DB 불변식). 정리·아티팩트 단계는 결과를 바꾸지 않는다.
+name: load-test
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: 실행할 시나리오
+        type: choice
+        required: true
+        default: smoke
+        options: [smoke, user-flow, order-contention, idempotency, order-race]
+      vus:
+        description: VU 수 (비우면 시나리오 기본값)
+        type: string
+        default: ''
+      duration:
+        description: 지속 시간 (smoke, user-flow 만. 예 60s)
+        type: string
+        default: ''
+      users:
+        description: fixture 사용자 수 (VU 이상)
+        type: string
+        default: '100'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SCENARIO: ${{ github.event_name == 'workflow_dispatch' && inputs.scenario || 'smoke' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: 스크립트 실행 권한 설정
+        run: chmod +x gradlew scripts/*.sh
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: 부하 테스트 실행
+        run: |
+          args=()
+          [ -n "${{ inputs.vus }}" ] && args+=(--vus "${{ inputs.vus }}")
+          [ -n "${{ inputs.duration }}" ] && args+=(--duration "${{ inputs.duration }}")
+          [ -n "${{ inputs.users }}" ] && args+=(--users "${{ inputs.users }}")
+          bash scripts/load-test.sh "$SCENARIO" "${args[@]}"
+
+      # 스크립트가 만든 report.md 를 Actions 실행 페이지 상단(job summary)에 붙인다.
+      # 아티팩트를 내려받지 않아도 threshold·주요 수치·DB 검증을 볼 수 있다. 판정(종료 코드)에는 영향을 주지 않는다.
+      - name: 리포트를 job summary 에 게시
+        if: always()
+        run: |
+          shopt -s nullglob
+          reports=(build/loadtest/*/report.md)
+          if [ ${#reports[@]} -eq 0 ]; then
+            echo "## 부하 테스트: \`$SCENARIO\` — 리포트 없음 (실행이 k6 이전 단계에서 중단됨. 로그 확인)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            cat "${reports[@]}" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # jar 이미지 컨텍스트는 크지 않지만 아티팩트에는 필요 없다.
+      - name: 결과 아티팩트 업로드 (k6 요약·검증·앱 로그·HTML 리포트)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: load-test-${{ env.SCENARIO }}-${{ github.run_number }}
+          path: |
+            build/loadtest/**
+            !build/loadtest/**/image/**
+          if-no-files-found: warn
+
+      # 스크립트의 trap 이 정리하지만, 러너가 스크립트를 중간에 죽였을 때를 대비한다.
+      # `docker compose down` 은 Compose 파일을 다시 해석하면서 앞 단계에서만 export 된 변수(RUN_ID 등)를 요구하므로
+      # 여기서는 Compose 를 거치지 않고 프로젝트 라벨(com.docker.compose.project)로 자원을 직접 지운다.
+      # 남은 fmarket-load-* 프로젝트만 대상이고, 결과(종료 코드)에는 영향을 주지 않는다.
+      - name: 잔여 컨테이너 정리
+        if: always()
+        run: |
+          projects=$(docker ps -a --filter 'label=com.docker.compose.project' \
+                       --format '{{.Label "com.docker.compose.project"}}' | sort -u | grep '^fmarket-load-' || true)
+          for p in $projects; do
+            echo "cleanup: $p"
+            f="label=com.docker.compose.project=$p"
+            # -v: 이미지의 VOLUME 으로 생긴 익명 볼륨(MySQL 데이터)도 함께 지운다.
+            docker rm -f -v $(docker ps -aq --filter "$f") 2>/dev/null || true
+            docker volume rm $(docker volume ls -q --filter "$f") 2>/dev/null || true
+            docker network rm $(docker network ls -q --filter "$f") 2>/dev/null || true
+            docker image rm $(docker image ls -q --filter "$f") 2>/dev/null || true
+          done

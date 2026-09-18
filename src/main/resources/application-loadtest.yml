@@ -1,0 +1,18 @@
+# 부하 테스트 전용 프로파일 (--spring.profiles.active=loadtest).
+# 측정값을 왜곡하는 로깅 경로를 끈다. 운영 로깅 정책과 다른 조건이므로 결과 보고에 그 차이를 남긴다.
+# (performance/README.md 의 "측정 조건" 참고)
+spring:
+  jpa:
+    properties:
+      hibernate:
+        format_sql: false
+
+# 요청/응답 본문 캐싱·문자열화 자체를 우회한다. 레벨만 낮추면 wrapper 생성과 인자 평가 비용이 남는다.
+# MDC(request_UUID, method, uri) 와 상태 코드·소요 시간 한 줄은 유지된다.
+fmarket:
+  http-log:
+    body-enabled: false
+
+logging:
+  level:
+    org.hibernate.SQL: WARN

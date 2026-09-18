@@ -1,0 +1,136 @@
+# 부하 테스트 전용 Compose. scripts/load-test.sh 가 실행마다 별도 project name(-p fmarket-load-<runId>)과
+# 임시 자격증명으로 띄운다. 개발용 docker-compose.yml 과 달리
+#   - container_name 을 두지 않는다 (같은 이름의 개발 컨테이너와 충돌하지 않게)
+#   - 호스트 포트를 열지 않는다 (k6 가 같은 네트워크 안에서 서비스 이름으로 호출한다)
+#   - .env 를 읽지 않는다 (개발 DB 자격증명·주소가 섞여 들어오지 않게)
+# 직접 `docker compose -f` 로 띄우지 말고 scripts/load-test.sh 를 쓴다.
+
+x-mysql-env: &mysql-env
+  MYSQL_DATABASE: ${MYSQL_DATABASE:?scripts/load-test.sh 가 설정한다}
+  MYSQL_USER: ${MYSQL_USER:?}
+  MYSQL_PASSWORD: ${MYSQL_PASSWORD:?}
+  MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?}
+  MYSQL_REPLICATION_USER: ${MYSQL_REPLICATION_USER:?}
+  MYSQL_REPLICATION_PASSWORD: ${MYSQL_REPLICATION_PASSWORD:?}
+  TZ: Asia/Seoul
+
+# 개발 compose 와 같은 이유(Windows 바인드 마운트의 cnf 무시)로 CLI 인자로도 지정한다.
+x-mysql-common-args: &mysql-common-args
+  - --sql-mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,ANSI_QUOTES
+  - --lower-case-table-names=1
+  - --slow-query-log=1
+
+x-mysql-healthcheck: &mysql-healthcheck
+  # 초기화 중인 임시 서버는 소켓만 열므로 TCP ping 이 성공하면 init 스크립트(복제 설정 포함)까지 끝난 것이다.
+  test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+  interval: 5s
+  timeout: 5s
+  retries: 36
+  start_period: 20s
+
+services:
+  db-master:
+    image: mysql:8.4
+    environment: *mysql-env
+    command:
+      - --sql-mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,ANSI_QUOTES
+      - --lower-case-table-names=1
+      - --slow-query-log=1
+      - --server-id=1
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --log-bin=mysql-master-bin
+    volumes:
+      - ../docker-init/master:/docker-entrypoint-initdb.d:ro
+      - ../docker-init/mysql-config/master.cnf:/etc/mysql/conf.d/master.cnf:ro
+    healthcheck: *mysql-healthcheck
+    networks:
+      - loadtest
+
+  db-replica:
+    image: mysql:8.4
+    environment: *mysql-env
+    command:
+      - --sql-mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,ANSI_QUOTES
+      - --lower-case-table-names=1
+      - --slow-query-log=1
+      - --server-id=2
+      - --relay-log=replica-relay-log
+      - --relay-log-purge=ON
+      - --read-only
+      - --log-replica-updates
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+    volumes:
+      - ../docker-init/replica:/docker-entrypoint-initdb.d:ro
+      - ../docker-init/mysql-config/replica.cnf:/etc/mysql/conf.d/replica.cnf:ro
+    healthcheck: *mysql-healthcheck
+    depends_on:
+      db-master:
+        condition: service_healthy
+    networks:
+      - loadtest
+
+  java-app:
+    build:
+      # 스크립트가 호스트에서 bootJar 로 만든 jar 만 담긴 디렉터리. 컨테이너 안에서 Gradle 을 다시 돌리지 않는다.
+      context: ${LOADTEST_IMAGE_CONTEXT:-../build/loadtest/image}
+      dockerfile_inline: |
+        FROM amazoncorretto:21-al2023-headless
+        WORKDIR /app
+        COPY app.jar app.jar
+        EXPOSE 8080 8081
+        ENTRYPOINT ["java", "-jar", "app.jar"]
+    environment:
+      SPRING_PROFILES_ACTIVE: loadtest
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?}
+      MYSQL_USER: ${MYSQL_USER:?}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?}
+      # application.yml 기본값(db-master/db-replica:3306)이 이 파일의 서비스 이름과 같다.
+      JAVA_TOOL_OPTIONS: ${LOADTEST_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=75}
+    depends_on:
+      db-master:
+        condition: service_healthy
+      db-replica:
+        condition: service_healthy
+    networks:
+      - loadtest
+
+  # 부하 발생기. `docker compose run --rm k6 run <script>` 로만 쓴다 (profiles 로 up 대상에서 제외).
+  k6:
+    image: ${K6_IMAGE:-grafana/k6:1.4.0}
+    profiles: ["tool"]
+    environment:
+      BASE_URL: http://java-app:8080
+      MGMT_URL: http://java-app:8081
+      RUN_ID: ${RUN_ID:?}
+      LT_PASSWORD: ${LT_PASSWORD:?}
+      LT_USERS: ${LT_USERS:-100}
+      # fixture 가 만든 ID 들 (scripts/load-test.sh 가 fixture.sql 출력에서 채운다)
+      LT_FLOW_PRODUCT_ID: ${LT_FLOW_PRODUCT_ID:-}
+      LT_FLOW_OPTION_IDS: ${LT_FLOW_OPTION_IDS:-}
+      LT_CONTENTION_OPTION_ID: ${LT_CONTENTION_OPTION_ID:-}
+      LT_IDEM_OPTION_OK_ID: ${LT_IDEM_OPTION_OK_ID:-}
+      LT_IDEM_OPTION_EMPTY_ID: ${LT_IDEM_OPTION_EMPTY_ID:-}
+      LT_RACE_OPTION_ID: ${LT_RACE_OPTION_ID:-}
+      LT_PRODUCT_IDS: ${LT_PRODUCT_IDS:-}
+      # 시나리오 파라미터 (k6 와 검증 SQL 이 같은 값을 보도록 스크립트가 함께 정한다)
+      LT_KEY_PREFIX: ${LT_KEY_PREFIX:-}
+      LT_RETRY_CONTRACT: ${LT_RETRY_CONTRACT:-}
+      LT_DUP_GROUPS: ${LT_DUP_GROUPS:-}
+      LT_DUP_VUS_PER_GROUP: ${LT_DUP_VUS_PER_GROUP:-}
+      LT_FAIL_VUS: ${LT_FAIL_VUS:-}
+      LT_MAX_QTY: ${LT_MAX_QTY:-}
+      VUS: ${VUS:-}
+      DURATION: ${DURATION:-}
+      ITERATIONS: ${ITERATIONS:-}
+      ROUNDS: ${ROUNDS:-}
+    volumes:
+      - ./k6:/scripts:ro
+      - ${LOADTEST_RESULTS_DIR:?}:/results
+    working_dir: /scripts
+    networks:
+      - loadtest
+
+networks:
+  loadtest:
