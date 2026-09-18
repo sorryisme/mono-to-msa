@@ -60,8 +60,21 @@ jobs:
           [ -n "${{ inputs.users }}" ] && args+=(--users "${{ inputs.users }}")
           bash scripts/load-test.sh "$SCENARIO" "${args[@]}"
 
+      # 스크립트가 만든 report.md 를 Actions 실행 페이지 상단(job summary)에 붙인다.
+      # 아티팩트를 내려받지 않아도 threshold·주요 수치·DB 검증을 볼 수 있다. 판정(종료 코드)에는 영향을 주지 않는다.
+      - name: 리포트를 job summary 에 게시
+        if: always()
+        run: |
+          shopt -s nullglob
+          reports=(build/loadtest/*/report.md)
+          if [ ${#reports[@]} -eq 0 ]; then
+            echo "## 부하 테스트: \`$SCENARIO\` — 리포트 없음 (실행이 k6 이전 단계에서 중단됨. 로그 확인)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            cat "${reports[@]}" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       # jar 이미지 컨텍스트는 크지 않지만 아티팩트에는 필요 없다.
-      - name: 결과 아티팩트 업로드 (k6 요약·검증·앱 로그)
+      - name: 결과 아티팩트 업로드 (k6 요약·검증·앱 로그·HTML 리포트)
         if: always()
         uses: actions/upload-artifact@v7
         with:

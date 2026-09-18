@@ -192,7 +192,12 @@ ok "replica 반영 완료 (users=$u, inventory rows=$i)"
 
 # ---------- 7. k6 ----------
 step "7/9 k6 실행: $scenario (VUS=${VUS:-기본} DURATION=${DURATION:-기본} ITERATIONS=${ITERATIONS:-기본} ROUNDS=${ROUNDS:-기본})"
-compose run --rm k6 run --summary-export /results/summary-export.json "$scenario.js" 2>&1 | tee "$RESULTS/k6.log"
+# k6 내장 web dashboard 를 켜서 종료 시 단일 HTML 리포트(시간축 그래프·요약 표)를 남긴다.
+# readiness/seed 실행에는 붙이지 않는다 — 같은 파일을 덮어쓰기만 하고 볼 가치가 없다.
+compose run --rm \
+  -e K6_WEB_DASHBOARD=true -e K6_WEB_DASHBOARD_EXPORT=/results/report.html \
+  -e K6_WEB_DASHBOARD_PERIOD="${K6_WEB_DASHBOARD_PERIOD:-2s}" \
+  k6 run --summary-export /results/summary-export.json "$scenario.js" 2>&1 | tee "$RESULTS/k6.log"
 k6_rc=${PIPESTATUS[0]}
 if [ "$k6_rc" -ne 0 ]; then err "k6 종료 코드 $k6_rc (threshold 위반 또는 실행 오류)"; rc=1; else ok "k6 threshold 통과"; fi
 
@@ -237,4 +242,60 @@ fi
 step "9/9 결과"
 [ -f "$RESULTS/k6-facts.txt" ] && sed 's/^/  /' "$RESULTS/k6-facts.txt" >&2
 if [ $rc -eq 0 ]; then ok "부하 테스트 통과: $scenario (run=$RUN_ID)"; else err "부하 테스트 실패: $scenario (run=$RUN_ID)"; fi
+
+# ---------- 리포트 (판정 이후. 실패해도 종료 코드를 바꾸지 않는다) ----------
+# report.md: CI 가 $GITHUB_STEP_SUMMARY 에 붙이는 마크다운. 재료는 k6.log 의 threshold 줄, k6-facts.txt, verify.txt.
+# report.html: k6 web dashboard export (그래프). 아티팩트에서 내려받아 연다.
+write_report() {
+  local md="$RESULTS/report.md" verdict
+  [ $rc -eq 0 ] && verdict="✅ 통과" || verdict="❌ 실패"
+  {
+    echo "## 부하 테스트: \`$scenario\` — $verdict"
+    echo
+    echo "| 항목 | 값 |"
+    echo "|---|---|"
+    echo "| run | \`$RUN_ID\` |"
+    echo "| 커밋 | \`$(git rev-parse --short HEAD 2>/dev/null || echo '-')\` |"
+    echo "| 부하 | VUS=${VUS:-기본} DURATION=${DURATION:-기본} ITERATIONS=${ITERATIONS:-기본} ROUNDS=${ROUNDS:-기본} USERS=${LT_USERS} |"
+    echo "| k6 종료 코드 | ${k6_rc:-?} |"
+    echo "| 측정 조건 | \`loadtest\` 프로파일(본문 로깅·SQL 로그 OFF). 절대값은 실행 환경 편차가 있어 기준선 없이 비교하지 않는다 |"
+    echo
+    echo "### k6 threshold"
+    echo
+    echo "| 결과 | threshold |"
+    echo "|---|---|"
+    # lib/summary.js 가 찍는 "  PASS  name: expr" 줄
+    if grep -qE '^  (PASS|FAIL)  ' "$RESULTS/k6.log" 2>/dev/null; then
+      grep -E '^  (PASS|FAIL)  ' "$RESULTS/k6.log" | sed -E 's/^  (PASS|FAIL)  (.*)$/| \1 | `\2` |/' | sed 's/| PASS |/| ✅ PASS |/; s/| FAIL |/| ❌ FAIL |/'
+    else
+      echo "| - | (k6 가 요약을 남기지 못함. k6.log 확인) |"
+    fi
+    echo
+    echo "### 주요 수치 (k6 관측)"
+    echo
+    echo "| metric | 값 |"
+    echo "|---|---|"
+    if [ -f "$RESULTS/k6-facts.txt" ]; then
+      grep -vE '^k6_(data_received|data_sent|thresholds_failed)=' "$RESULTS/k6-facts.txt" | sed -E 's/^k6_([^=]+)=(.*)$/| `\1` | \2 |/'
+    else
+      echo "| - | (없음) |"
+    fi
+    echo
+    echo "### DB 사후 검증 (master)"
+    echo
+    if [ -f "$RESULTS/verify.txt" ]; then
+      echo "| 결과 | 검사 | 상세 |"
+      echo "|---|---|---|"
+      awk -F'\t' '{ r=$2; if (r=="PASS") r="✅ PASS"; else if (r=="FAIL") r="❌ FAIL"; else r="ℹ️ " r; printf "| %s | `%s` | %s |\n", r, $1, $3 }' "$RESULTS/verify.txt"
+    else
+      echo "이 시나리오는 사후 검증이 없다."
+    fi
+    echo
+    echo "그래프·시간축은 아티팩트의 \`report.html\`(k6 web dashboard export), 전체 metric 은 \`summary.json\` 참고."
+  } > "$md" 2>/dev/null && info "리포트: $md" || warn "report.md 생성 실패 (판정에는 영향 없음)"
+  # k6 는 실행이 dashboard 집계 주기 몇 배보다 짧으면 "not enough data" 로 HTML 생성을 건너뛴다.
+  # 경합 시나리오(수백 ms)는 원래 그렇고, smoke/user-flow 처럼 수십 초 도는 실행에는 있어야 한다.
+  [ -f "$RESULTS/report.html" ] && info "리포트: $RESULTS/report.html" || info "report.html 없음 (실행이 짧아 k6 가 그래프 생성을 건너뜀. 경합 시나리오는 정상)"
+}
+write_report
 exit $rc

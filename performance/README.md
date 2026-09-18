@@ -28,7 +28,15 @@ bash scripts/load-test.sh order-race --rounds 50 --vus 10
 8. 활성 트랜잭션이 없어질 때까지 기다린 뒤 master 에서 시나리오별 사후 검증 SQL 실행. `FAIL` 행이 하나라도 있으면 실패
 9. 앱·DB 로그 수집 후 `down -v --rmi local` (해당 프로젝트만). 종료 코드는 7·8 의 판정을 그대로 보존
 
-산출물은 `build/loadtest/<runId>/` 에 남는다: `k6.log`, `summary.json`, `summary-export.json`, `k6-facts.txt`, `verify.txt`, `app.log`, `db.log`.
+산출물은 `build/loadtest/<runId>/` 에 남는다: `k6.log`, `summary.json`, `summary-export.json`, `k6-facts.txt`, `verify.txt`, `app.log`, `db.log`, 그리고 리포트 두 개.
+
+### 리포트
+
+- `report.md`: threshold 결과, 주요 수치, DB 사후 검증을 표로 정리한 마크다운. CI 에서는 Actions 실행 페이지 상단(job summary)에 그대로 게시된다.
+- `report.html`: k6 web dashboard export. RPS·지연 percentile·VU·실패율의 시간축 그래프와 요약 표가 든 단일 HTML 파일이다. 아티팩트에서 내려받아 브라우저로 연다.
+  집계 주기는 `K6_WEB_DASHBOARD_PERIOD`(기본 2초). 실행이 그보다 몇 배 짧으면 k6 가 "not enough data" 로 생성을 건너뛴다 — 수백 ms 에 끝나는 경합 시나리오는 원래 없고, smoke/user-flow 에는 있다.
+
+리포트 생성은 판정 뒤에 실행되며 실패해도 종료 코드를 바꾸지 않는다.
 
 ### 방어 조건
 
