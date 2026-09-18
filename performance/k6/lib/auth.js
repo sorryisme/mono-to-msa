@@ -6,16 +6,14 @@
 
 import http from 'k6/http';
 import { check } from 'k6';
-import { Counter } from 'k6/metrics';
 import { BASE_URL, USER_PASSWORD } from './config.js';
-import { params, isOk } from './http.js';
+import { params, isOk, loginFailures } from './http.js';
 
 const SESSION_COOKIE = 'JSESSIONID';
 
 // 로그인 요청은 phase:login/setup 태그라 본 측정 threshold(checks{phase:main}) 밖에 있다.
 // 일부 VU 만 로그인에 실패하면 나머지 VU 가 모든 threshold 를 통과해 "성공" 으로 끝날 수 있으므로
-// 실패를 별도 카운터로 세고 baseThresholds 가 count==0 을 강제한다.
-export const loginFailures = new Counter('login_failures');
+// 실패를 login_failures 카운터(lib/http.js)로 세고 baseThresholds 가 count==0 을 강제한다.
 
 /**
  * 로그인하고 세션 쿠키 값을 돌려준다. 실패하면 null. phase 태그로 본 측정에서 분리된다.

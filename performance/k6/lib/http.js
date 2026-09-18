@@ -15,6 +15,9 @@ export const serverErrors = new Counter('server_errors');
 export const transportErrors = new Counter('transport_errors');
 // 허용 목록에 없는 4xx 또는 허용 상태인데 본문 code 가 다른 경우.
 export const unexpectedRejects = new Counter('unexpected_rejects');
+// setup/login 단계의 로그인 실패 (lib/auth.js 가 올린다). 여기에 두는 이유: baseThresholds 가 이 metric 에
+// threshold 를 걸므로 로그인이 없는 시나리오(smoke)에서도 metric 이 등록돼 있어야 k6 가 시작을 거부하지 않는다.
+export const loginFailures = new Counter('login_failures');
 
 export const expect2xx = http.expectedStatuses({ min: 200, max: 299 });
 export const expect2xxOr409 = http.expectedStatuses({ min: 200, max: 299 }, 409);
