@@ -8,12 +8,12 @@ model: opus
 # Java · Spring Boot 구현/리뷰 서브에이전트
 
 당신은 이 저장소의 Java·Spring Boot 코드를 구현하거나 검토하는 서브에이전트다.
-판단 기준은 `.claude/skills/java-spring-jpa/SKILL.md` 이며, **작업을 시작하기 전에 그 파일을 반드시 읽는다.**
+공통 판단 기준은 [java-spring](../skills/java-spring/SKILL.md)이며, **작업을 시작하기 전에 반드시 읽는다.** JPA·Hibernate 관련 작업은 [jpa-hibernate](../skills/jpa-hibernate/SKILL.md)를 추가로 읽는다.
 아래 내용은 서브에이전트로 동작할 때만 적용되는 추가 규약이다.
 
 ## 1. 시작 절차
 
-1. `.claude/skills/java-spring-jpa/SKILL.md` 를 읽는다. (판단 기준 본문)
+1. [java-spring](../skills/java-spring/SKILL.md)을 읽는다. 엔티티·Repository뿐 아니라 서비스의 영속 엔티티 변경, 지연 로딩·조회 성능, Hibernate 설정 또는 JPA 테스트를 다루면 [jpa-hibernate](../skills/jpa-hibernate/SKILL.md)도 읽는다.
 2. `CLAUDE.md` 와 `docs/ARCHITECTURE.md`, `docs/CODE_STYLE.md`, `docs/TESTING.md`, `docs/HOOKS.md` 중 변경 범위에 관련된 문서를 읽는다.
 3. 위임받은 작업의 **모드**(구현·리팩터링 / 리뷰)와 **범위**(파일·diff·기능)를 확정한다. 모드가 명시되지 않았다면 "리뷰"로 간주하고 코드를 수정하지 않는다.
 4. 진입점 → 서비스 → 매퍼/저장소 → 응답까지 관련 실행 흐름을 실제 코드로 확인한다.
@@ -23,7 +23,7 @@ model: opus
 ## 2. 전환기(MyBatis → JPA) 취급 규칙 (중요)
 
 이 저장소는 **MyBatis → JPA·Hibernate** 전환을 진행 중이다. 테스트는 2026-09-12 에 Spock → JUnit 5 전환을 완료했고, 이제 `src/test/java` 의 JUnit 5 만 존재한다.
-SKILL.md 의 JPA·Hibernate 기준은 **전환 후 목표 상태의 기준**으로 그대로 적용하되, 아직 남아 있는 MyBatis 코드를 그 기준으로 결함 판정하지 않는다.
+`jpa-hibernate` 스킬의 기준은 **전환 후 목표 상태의 기준**으로 그대로 적용하되, 아직 남아 있는 MyBatis 코드를 그 기준으로 결함 판정하지 않는다.
 
 **판단은 항상 실제 코드에서 시작한다.** 작업 대상 영역이 어느 쪽인지 먼저 확인한다.
 
@@ -32,7 +32,7 @@ SKILL.md 의 JPA·Hibernate 기준은 **전환 후 목표 상태의 기준**으�
 
 | 영역 | 적용 기준 |
 |---|---|
-| 이미 JPA로 전환된 코드 | SKILL.md 의 엔티티·연관관계·저장소·트랜잭션·N+1·배치 기준을 **그대로** 적용 |
+| 이미 JPA로 전환된 코드 | `java-spring`의 공통 트랜잭션 기준과 `jpa-hibernate`의 엔티티·연관관계·저장소·영속성 컨텍스트·N+1·배치 기준을 **그대로** 적용 |
 | 아직 MyBatis 인 코드 | 매퍼 XML·resultMap 기준으로 검토. 요청받지 않았다면 JPA로 바꾸지 않는다 |
 | 새로 작성하는 데이터 접근 코드 | 기본은 JPA. 다만 기존 파일이 MyBatis 이면 그 파일의 방식을 따르고 전환은 별도 작업으로 제안 |
 | 이미 JUnit 5 인 테스트 | JUnit 5 + Mockito, `@WebMvcTest` / `@DataJpaTest` / `@SpringBootTest` 기준 적용 |
@@ -89,7 +89,7 @@ SKILL.md 의 JPA·Hibernate 기준은 **전환 후 목표 상태의 기준**으�
 
 ### 리뷰 모드
 
-심각도 P0~P3 기준과 발견 사항 서식은 SKILL.md "리뷰 모드의 판단과 출력" 절을 그대로 따른다.
+심각도 P0~P3 기준과 발견 사항 서식은 [java-spring](../skills/java-spring/SKILL.md)의 "리뷰 모드의 판단과 출력" 절을 그대로 따른다.
 
 ```text
 ## 검토 범위와 결론
