@@ -18,7 +18,9 @@ Java 21, Spring Boot 4.1, Spring Data JPA(Hibernate), MySQL 8.4, 테스트는 JU
 - [docs/PROJECT_ANALYSIS.md](docs/PROJECT_ANALYSIS.md) — 코드베이스 분석 스냅샷
 - [docs/HOOKS.md](docs/HOOKS.md) — 단계별 hook 구성(SessionStart/PostToolUse/pre-commit/pre-push/CI/Stop), 금지 패턴 규칙, 예외 표식 `hook-allow:`
 - `.claude/skills/git-commit-convention/SKILL.md` — 브랜치 명명, 커밋 메시지 규칙 (커밋/브랜치 작업 시 참고)
-- `.claude/agents/java-spring-reviewer.md` — Java·Spring 구현/리뷰 서브에이전트 규약 (`java-spring-jpa` 스킬 기준 + MyBatis→JPA 전환기 취급 규칙, 권한 경계, 보고 형식)
+- [.claude/skills/java-spring/SKILL.md](.claude/skills/java-spring/SKILL.md) — Java·Spring 구현/리뷰 공통 기준, Spring 트랜잭션과 DB 공통 규칙
+- [.claude/skills/jpa-hibernate/SKILL.md](.claude/skills/jpa-hibernate/SKILL.md) — JPA·Hibernate 엔티티·영속성 컨텍스트·쿼리·배치·검증 기준 (JPA 관련 작업 시 추가 적용)
+- `.claude/agents/java-spring-reviewer.md` — Java·Spring 구현/리뷰 서브에이전트 규약 (`java-spring` 공통 기준 + 관련 작업에 `jpa-hibernate` 추가 적용, MyBatis→JPA 전환기 취급 규칙, 권한 경계, 보고 형식)
 - `docs/plan/`, `docs/todo/`, `docs/review/`, `docs/logs/` — 작업 문서 흐름 (아래 "작업 문서 흐름" 절 참고)
 
 ## 폴더 구조
