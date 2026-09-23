@@ -21,6 +21,12 @@ Java 21, Spring Boot 4.1, Spring Data JPA(Hibernate), MySQL 8.4, 테스트는 JU
 - [.claude/skills/java-spring/SKILL.md](.claude/skills/java-spring/SKILL.md) — Java·Spring 구현/리뷰 공통 기준, Spring 트랜잭션과 DB 공통 규칙
 - [.claude/skills/jpa-hibernate/SKILL.md](.claude/skills/jpa-hibernate/SKILL.md) — JPA·Hibernate 엔티티·영속성 컨텍스트·쿼리·배치·검증 기준 (JPA 관련 작업 시 추가 적용)
 - `.claude/agents/java-spring-reviewer.md` — Java·Spring 구현/리뷰 서브에이전트 규약 (`java-spring` 공통 기준 + 관련 작업에 `jpa-hibernate` 추가 적용, MyBatis→JPA 전환기 취급 규칙, 권한 경계, 보고 형식)
+- `.claude/agents/` 리뷰 전용 서브에이전트 (편집 권한 없음, 보고 형식은 `java-spring` 스킬의 리뷰 모드를 따름)
+  - `consistency-reviewer.md` — 주문·재고·멱등성·상태 전이·readOnly 라우팅의 동시성과 데이터 정합성
+  - `test-quality-reviewer.md` — 테스트 누락, 단언의 힘, mock 테스트의 증명 범위 과장, docs/TESTING.md 관례
+  - `security-reviewer.md` — 세션 인증, 리소스 소유권(IDOR), 역할 권한, SQL 인젝션 등 기본 웹 취약점, 민감 정보 노출, 설정·CI 비밀
+  - `query-plan-reviewer.md` — 복잡한 SELECT(조인·동적 조건·범위·정렬+페이징·count)만 골라 EXPLAIN 으로 인덱스 사용·filesort·풀 스캔 확인. 단순 단건 조회와 쓰기 쿼리는 제외
+  - `api-contract-reviewer.md` — 응답 봉투·HTTP 상태·ErrorCode 매핑, 요청·응답 DTO 하위 호환성, `@Valid` 누락, 페이지 직렬화, docs/API_RESPONSE.md·계약 테스트 동기화
 - `docs/plan/`, `docs/todo/`, `docs/review/`, `docs/logs/` — 작업 문서 흐름 (아래 "작업 문서 흐름" 절 참고)
 
 ## 폴더 구조
